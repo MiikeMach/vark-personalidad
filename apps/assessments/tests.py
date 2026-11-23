@@ -10,6 +10,7 @@ from django.test import SimpleTestCase
 from apps.assessments.services import validar_evaluacion_editable
 from apps.assessments.models import Respuesta, SeleccionRespuesta
 from apps.assessments.services import guardar_respuesta
+from apps.assessments.services import validar_distribucion_personalidad
 
 
 class ValidarSeleccionesTests(TestCase):
@@ -225,3 +226,34 @@ class ValidarEvaluacionEditableTests(SimpleTestCase):
 
         with self.assertRaises(ValidationError):
             validar_evaluacion_editable(evaluacion)
+class ValidarDistribucionPersonalidadTests(SimpleTestCase):
+
+    def test_acepta_distribucion_7_3(self):
+        self.assertTrue(
+            validar_distribucion_personalidad(7, 3)
+        )
+
+    def test_acepta_distribucion_10_0(self):
+        self.assertTrue(
+            validar_distribucion_personalidad(10, 0)
+        )
+
+    def test_rechaza_distribucion_5_5(self):
+        with self.assertRaises(ValidationError):
+            validar_distribucion_personalidad(5, 5)
+
+    def test_rechaza_suma_diferente_de_10(self):
+        with self.assertRaises(ValidationError):
+            validar_distribucion_personalidad(6, 2)
+
+    def test_rechaza_puntos_fuera_de_rango(self):
+        with self.assertRaises(ValidationError):
+            validar_distribucion_personalidad(11, -1)
+
+    def test_rechaza_valores_no_enteros(self):
+        with self.assertRaises(ValidationError):
+            validar_distribucion_personalidad(7.5, 2.5)
+
+    def test_rechaza_valores_booleanos(self):
+        with self.assertRaises(ValidationError):
+            validar_distribucion_personalidad(True, 9)

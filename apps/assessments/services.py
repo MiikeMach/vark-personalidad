@@ -115,3 +115,32 @@ def guardar_respuesta(evaluacion_id, pregunta_id, opcion_ids):
     )
 
     return respuesta
+
+def validar_distribucion_personalidad(puntos_1, puntos_2):
+    """
+    Valida que dos dimensiones opuestas reciban
+    exactamente 10 puntos, sin reparto 5/5.
+    """
+
+    for puntos in (puntos_1, puntos_2):
+        if type(puntos) is not int:
+            raise ValidationError(
+                "Los puntos deben ser números enteros."
+            )
+
+        if not 0 <= puntos <= 10:
+            raise ValidationError(
+                "Cada puntuación debe estar entre 0 y 10."
+            )
+
+    if puntos_1 + puntos_2 != 10:
+        raise ValidationError(
+            "Las dos puntuaciones deben sumar 10."
+        )
+
+    if puntos_1 == 5 and puntos_2 == 5:
+        raise ValidationError(
+            "No se permite distribuir 5 puntos a cada dimensión."
+        )
+
+    return True
