@@ -1,7 +1,10 @@
 
 from django.core.exceptions import ValidationError
+from apps.assessments.models import Evaluacion
 
 from apps.questionnaires.models import Cuestionario, Opcion, Pregunta
+from django.db import transaction
+from apps.assessments.models import Respuesta, SeleccionRespuesta
 
 
 def validar_selecciones(evaluacion, pregunta_id, opcion_ids):
@@ -56,3 +59,59 @@ def validar_selecciones(evaluacion, pregunta_id, opcion_ids):
         )
 
     return opciones
+
+def validar_evaluacion_editable(evaluacion):
+    """
+    Comprueba que una evaluación todavía pueda modificarse.
+
+    Una evaluación finalizada no debe admitir cambios
+    en sus respuestas.
+    """
+    if evaluacion.estado != Evaluacion.Estado.EN_PROGRESO:
+        raise ValidationError(
+            "No se pueden modificar respuestas de una evaluación finalizada."
+        )
+
+@transaction.atomic
+def guardar_respuesta(evaluacion_id, pregunta_id, opcion_ids):
+    """
+    Guarda o actualiza las opciones seleccionadas
+    para una pregunta dentro de una evaluación.
+
+    Permite una lista vacía para registrar una omisión.
+    """
+
+    evaluacion = (
+        Evaluacion.objects
+        .select_for_update()
+        .select_related("cuestionario")
+        .get(pk=evaluacion_id)
+    )
+
+    validar_evaluacion_editable(evaluacion)
+
+    opciones = validar_selecciones(
+        evaluacion,
+        pregunta_id,
+        opcion_ids,
+    )
+
+    respuesta, _ = Respuesta.objects.get_or_create(
+        evaluacion=evaluacion,
+        pregunta_id=pregunta_id,
+    )
+
+    # Reemplazamos las selecciones anteriores.
+    respuesta.selecciones.all().delete()
+
+    SeleccionRespuesta.objects.bulk_create(
+        [
+            SeleccionRespuesta(
+                respuesta=respuesta,
+                opcion=opcion,
+            )
+            for opcion in opciones
+        ]
+    )
+
+    return respuesta

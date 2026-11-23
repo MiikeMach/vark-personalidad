@@ -6,6 +6,10 @@ from apps.assessments.models import Evaluacion
 from apps.assessments.services import validar_selecciones
 from apps.questionnaires.models import Cuestionario, Opcion, Pregunta
 from apps.students.models import Estudiante, Grupo
+from django.test import SimpleTestCase
+from apps.assessments.services import validar_evaluacion_editable
+from apps.assessments.models import Respuesta, SeleccionRespuesta
+from apps.assessments.services import guardar_respuesta
 
 
 class ValidarSeleccionesTests(TestCase):
@@ -143,3 +147,81 @@ class ValidarSeleccionesTests(TestCase):
                 self.pregunta_personalidad.pk,
                 [self.opcion_e.pk],
             )
+    def test_guardar_respuesta_con_varias_opciones(self):
+        respuesta = guardar_respuesta(
+            self.evaluacion_vark.pk,
+            self.pregunta_vark.pk,
+            [self.opcion_v.pk, self.opcion_a.pk],
+        )
+
+        self.assertEqual(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion_vark,
+                pregunta=self.pregunta_vark,
+            ).count(),
+            1,
+        )
+        self.assertEqual(respuesta.selecciones.count(), 2)
+
+    def test_actualizar_respuesta_reemplaza_selecciones(self):
+        guardar_respuesta(
+            self.evaluacion_vark.pk,
+            self.pregunta_vark.pk,
+            [self.opcion_v.pk],
+        )
+
+        respuesta = guardar_respuesta(
+            self.evaluacion_vark.pk,
+            self.pregunta_vark.pk,
+            [self.opcion_a.pk],
+        )
+
+        self.assertEqual(respuesta.selecciones.count(), 1)
+        self.assertTrue(
+            respuesta.selecciones.filter(
+                opcion=self.opcion_a
+            ).exists()
+        )
+
+    def test_guardar_pregunta_omitida(self):
+        respuesta = guardar_respuesta(
+            self.evaluacion_vark.pk,
+            self.pregunta_vark.pk,
+            [],
+        )
+
+        self.assertEqual(respuesta.selecciones.count(), 0)
+
+    def test_no_modificar_evaluacion_finalizada(self):
+        self.evaluacion_vark.estado = Evaluacion.Estado.FINALIZADA
+        self.evaluacion_vark.save(update_fields=["estado"])
+
+        with self.assertRaises(ValidationError):
+            guardar_respuesta(
+                self.evaluacion_vark.pk,
+                self.pregunta_vark.pk,
+                [self.opcion_v.pk],
+            )
+
+        self.assertFalse(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion_vark
+            ).exists()
+        )
+
+class ValidarEvaluacionEditableTests(SimpleTestCase):
+
+    def test_permite_evaluacion_en_progreso(self):
+        evaluacion = Evaluacion(
+            estado=Evaluacion.Estado.EN_PROGRESO
+        )
+
+        validar_evaluacion_editable(evaluacion)
+
+    def test_rechaza_evaluacion_finalizada(self):
+        evaluacion = Evaluacion(
+            estado=Evaluacion.Estado.FINALIZADA
+        )
+
+        with self.assertRaises(ValidationError):
+            validar_evaluacion_editable(evaluacion)
