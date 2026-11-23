@@ -1,4 +1,4 @@
-"""Endpoints CRUD básicos (View de Django + JsonResponse), sin CSRF por ahora."""
+"""Endpoints CRUD básicos (View de Django + JsonResponse) con auth por sesión."""
 
 import json
 from django.http import JsonResponse
@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.contrib.auth import authenticate, login, logout
 
 from apps.students.models import Grupo, Estudiante
 from apps.questionnaires.models import Cuestionario, Pregunta, Opcion
@@ -16,6 +17,7 @@ from apps.assessments.models import Evaluacion, Respuesta, SeleccionRespuesta
 from apps.results.models import Resultado, PuntajeDimension
 
 from . import serializers as s
+from .auth import require_staff, user_to_dict
 
 
 # ---------- utilidades ----------
@@ -34,7 +36,6 @@ def _payload(request):
 
 
 def _bool_param(request, name):
-    """Devuelve True/False si el param está presente; None si no."""
     raw = request.GET.get(name)
     if raw is None:
         return None
@@ -42,7 +43,6 @@ def _bool_param(request, name):
 
 
 def _int_param(request, name):
-    """Devuelve int si es válido; None si no está o es inválido."""
     raw = request.GET.get(name)
     if raw is None or raw == "":
         return None
@@ -60,14 +60,59 @@ def _str_param(request, name):
 
 
 # =====================================================================
-# Base genérica (con CSRF exento mientras no haya auth)
+# Auth (login/logout/me)
+# =====================================================================
+
+@method_decorator(csrf_exempt, name="dispatch")
+class LoginView(View):
+    """POST /api/auth/login/  {"username": "...", "password": "..."}"""
+
+    def post(self, request, *args, **kwargs):
+        try:
+            body = _payload(request)
+        except ValidationError as e:
+            return _json_error(e.messages[0])
+        username = (body.get("username") or "").strip()
+        password = body.get("password") or ""
+        if not username or not password:
+            return _json_error("username y password son obligatorios.")
+        user = authenticate(request, username=username, password=password)
+        if user is None:
+            return _json_error("Credenciales inválidas.", status=401)
+        if not user.is_active:
+            return _json_error("Usuario inactivo.", status=403)
+        login(request, user)
+        return JsonResponse({"user": user_to_dict(user)})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class LogoutView(View):
+    """POST /api/auth/logout/"""
+
+    def post(self, request, *args, **kwargs):
+        logout(request)
+        return JsonResponse({"detail": "Sesión cerrada."})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class MeView(View):
+    """GET /api/auth/me/"""
+
+    def get(self, request, *args, **kwargs):
+        if not request.user or not request.user.is_authenticated:
+            return JsonResponse({"user": None}, status=401)
+        return JsonResponse({"user": user_to_dict(request.user)})
+
+
+# =====================================================================
+# Base genérica
 # =====================================================================
 
 @method_decorator(csrf_exempt, name="dispatch")
 class BaseListView(View):
     """
-    GET  -> lista (con filtros opcionales)
-    POST -> crea
+    GET  -> lista (público, con filtros)
+    POST -> crea (solo staff)
     """
     model = None
     to_dict = None
@@ -75,7 +120,6 @@ class BaseListView(View):
     ordering = None
 
     def get_queryset(self, request):
-        """Sobrescribir para aplicar filtros por query string."""
         return self.model.objects.all()
 
     def get(self, request, *args, **kwargs):
@@ -85,6 +129,7 @@ class BaseListView(View):
         data = [self.to_dict(o) for o in qs]
         return JsonResponse(data, safe=False)
 
+    @require_staff
     def post(self, request, *args, **kwargs):
         try:
             body = _payload(request)
@@ -105,10 +150,10 @@ class BaseListView(View):
 @method_decorator(csrf_exempt, name="dispatch")
 class BaseDetailView(View):
     """
-    GET    -> detalle
-    PUT    -> actualiza (requiere todos los campos editables)
-    PATCH  -> actualiza parcial
-    DELETE -> elimina
+    GET    -> detalle (público)
+    PUT    -> actualiza (staff)
+    PATCH  -> actualiza parcial (staff)
+    DELETE -> elimina (staff)
     """
     model = None
     to_dict = None
@@ -120,11 +165,22 @@ class BaseDetailView(View):
     def get(self, request, pk, *args, **kwargs):
         return JsonResponse(self.to_dict(self._get(pk)))
 
+    @require_staff
     def put(self, request, pk, *args, **kwargs):
         return self._update(request, pk, partial=False)
 
+    @require_staff
     def patch(self, request, pk, *args, **kwargs):
         return self._update(request, pk, partial=True)
+
+    @require_staff
+    def delete(self, request, pk, *args, **kwargs):
+        obj = self._get(pk)
+        try:
+            obj.delete()
+        except IntegrityError as e:
+            return _json_error(str(e), status=409)
+        return JsonResponse({}, status=204)
 
     def _update(self, request, pk, partial):
         obj = self._get(pk)
@@ -148,14 +204,6 @@ class BaseDetailView(View):
         except IntegrityError as e:
             return _json_error(str(e), status=409)
         return JsonResponse(self.to_dict(obj))
-
-    def delete(self, request, pk, *args, **kwargs):
-        obj = self._get(pk)
-        try:
-            obj.delete()
-        except IntegrityError as e:
-            return _json_error(str(e), status=409)
-        return JsonResponse({}, status=204)
 
 
 # =====================================================================
