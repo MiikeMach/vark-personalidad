@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from apps.students.models import Grupo, Estudiante
 from apps.questionnaires.models import Cuestionario, Pregunta, Opcion
@@ -32,6 +33,32 @@ def _payload(request):
         raise ValidationError("JSON inválido.")
 
 
+def _bool_param(request, name):
+    """Devuelve True/False si el param está presente; None si no."""
+    raw = request.GET.get(name)
+    if raw is None:
+        return None
+    return raw.strip().lower() in ("1", "true", "yes", "y", "t")
+
+
+def _int_param(request, name):
+    """Devuelve int si es válido; None si no está o es inválido."""
+    raw = request.GET.get(name)
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _str_param(request, name):
+    raw = request.GET.get(name)
+    if raw is None or raw.strip() == "":
+        return None
+    return raw.strip()
+
+
 # =====================================================================
 # Base genérica (con CSRF exento mientras no haya auth)
 # =====================================================================
@@ -39,7 +66,7 @@ def _payload(request):
 @method_decorator(csrf_exempt, name="dispatch")
 class BaseListView(View):
     """
-    GET  -> lista
+    GET  -> lista (con filtros opcionales)
     POST -> crea
     """
     model = None
@@ -47,14 +74,15 @@ class BaseListView(View):
     fields = ()
     ordering = None
 
-    def get_queryset(self):
-        qs = self.model.objects.all()
-        if self.ordering:
-            qs = qs.order_by(self.ordering)
-        return qs
+    def get_queryset(self, request):
+        """Sobrescribir para aplicar filtros por query string."""
+        return self.model.objects.all()
 
     def get(self, request, *args, **kwargs):
-        data = [self.to_dict(o) for o in self.get_queryset()]
+        qs = self.get_queryset(request)
+        if self.ordering:
+            qs = qs.order_by(self.ordering)
+        data = [self.to_dict(o) for o in qs]
         return JsonResponse(data, safe=False)
 
     def post(self, request, *args, **kwargs):
@@ -140,6 +168,16 @@ class GrupoListView(BaseListView):
     fields = ("clave", "nombre", "activo")
     ordering = "nombre"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        activo = _bool_param(request, "activo")
+        if activo is not None:
+            qs = qs.filter(activo=activo)
+        q = _str_param(request, "q")
+        if q:
+            qs = qs.filter(Q(clave__icontains=q) | Q(nombre__icontains=q))
+        return qs
+
 
 class GrupoDetailView(BaseDetailView):
     model = Grupo
@@ -152,6 +190,24 @@ class EstudianteListView(BaseListView):
     to_dict = staticmethod(s.estudiante_to_dict)
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
     ordering = ("apellidos", "nombres")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            qs = qs.filter(grupo_id=grupo)
+        activo = _bool_param(request, "activo")
+        if activo is not None:
+            qs = qs.filter(activo=activo)
+        q = _str_param(request, "q")
+        if q:
+            qs = qs.filter(
+                Q(matricula__icontains=q)
+                | Q(nombres__icontains=q)
+                | Q(apellidos__icontains=q)
+                | Q(correo__icontains=q)
+            )
+        return qs
 
 
 class EstudianteDetailView(BaseDetailView):
@@ -170,6 +226,19 @@ class CuestionarioListView(BaseListView):
     fields = ("titulo", "descripcion", "instrucciones", "tipo", "activo")
     ordering = ("tipo", "titulo")
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        tipo = _str_param(request, "tipo")
+        if tipo:
+            qs = qs.filter(tipo__iexact=tipo)
+        activo = _bool_param(request, "activo")
+        if activo is not None:
+            qs = qs.filter(activo=activo)
+        q = _str_param(request, "q")
+        if q:
+            qs = qs.filter(Q(titulo__icontains=q) | Q(descripcion__icontains=q))
+        return qs
+
 
 class CuestionarioDetailView(BaseDetailView):
     model = Cuestionario
@@ -183,6 +252,13 @@ class PreguntaListView(BaseListView):
     fields = ("cuestionario", "texto", "orden")
     ordering = "orden"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        cuestionario = _int_param(request, "cuestionario")
+        if cuestionario is not None:
+            qs = qs.filter(cuestionario_id=cuestionario)
+        return qs
+
 
 class PreguntaDetailView(BaseDetailView):
     model = Pregunta
@@ -195,6 +271,16 @@ class OpcionListView(BaseListView):
     to_dict = staticmethod(s.opcion_to_dict)
     fields = ("pregunta", "texto", "dimension", "orden")
     ordering = "orden"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        pregunta = _int_param(request, "pregunta")
+        if pregunta is not None:
+            qs = qs.filter(pregunta_id=pregunta)
+        dimension = _str_param(request, "dimension")
+        if dimension:
+            qs = qs.filter(dimension__iexact=dimension)
+        return qs
 
 
 class OpcionDetailView(BaseDetailView):
@@ -213,6 +299,25 @@ class EvaluacionListView(BaseListView):
     fields = ("estudiante", "cuestionario", "estado")
     ordering = "-iniciada_en"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        estudiante = _int_param(request, "estudiante")
+        if estudiante is not None:
+            qs = qs.filter(estudiante_id=estudiante)
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            qs = qs.filter(estudiante__grupo_id=grupo)
+        cuestionario = _int_param(request, "cuestionario")
+        if cuestionario is not None:
+            qs = qs.filter(cuestionario_id=cuestionario)
+        tipo = _str_param(request, "tipo")
+        if tipo:
+            qs = qs.filter(cuestionario__tipo__iexact=tipo)
+        estado = _str_param(request, "estado")
+        if estado:
+            qs = qs.filter(estado__iexact=estado)
+        return qs
+
 
 class EvaluacionDetailView(BaseDetailView):
     model = Evaluacion
@@ -226,6 +331,16 @@ class RespuestaListView(BaseListView):
     fields = ("evaluacion", "pregunta")
     ordering = "id"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        evaluacion = _int_param(request, "evaluacion")
+        if evaluacion is not None:
+            qs = qs.filter(evaluacion_id=evaluacion)
+        pregunta = _int_param(request, "pregunta")
+        if pregunta is not None:
+            qs = qs.filter(pregunta_id=pregunta)
+        return qs
+
 
 class RespuestaDetailView(BaseDetailView):
     model = Respuesta
@@ -238,6 +353,16 @@ class SeleccionListView(BaseListView):
     to_dict = staticmethod(s.seleccion_to_dict)
     fields = ("respuesta", "opcion")
     ordering = "id"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        respuesta = _int_param(request, "respuesta")
+        if respuesta is not None:
+            qs = qs.filter(respuesta_id=respuesta)
+        opcion = _int_param(request, "opcion")
+        if opcion is not None:
+            qs = qs.filter(opcion_id=opcion)
+        return qs
 
 
 class SeleccionDetailView(BaseDetailView):
@@ -261,6 +386,22 @@ class ResultadoListView(BaseListView):
     )
     ordering = "-calculado_en"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        evaluacion = _int_param(request, "evaluacion")
+        if evaluacion is not None:
+            qs = qs.filter(evaluacion_id=evaluacion)
+        estudiante = _int_param(request, "estudiante")
+        if estudiante is not None:
+            qs = qs.filter(evaluacion__estudiante_id=estudiante)
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            qs = qs.filter(evaluacion__estudiante__grupo_id=grupo)
+        tipo = _str_param(request, "tipo")
+        if tipo:
+            qs = qs.filter(evaluacion__cuestionario__tipo__iexact=tipo)
+        return qs
+
 
 class ResultadoDetailView(BaseDetailView):
     model = Resultado
@@ -277,6 +418,16 @@ class PuntajeListView(BaseListView):
     to_dict = staticmethod(s.puntaje_to_dict)
     fields = ("resultado", "dimension", "puntaje")
     ordering = "dimension"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        resultado = _int_param(request, "resultado")
+        if resultado is not None:
+            qs = qs.filter(resultado_id=resultado)
+        dimension = _str_param(request, "dimension")
+        if dimension:
+            qs = qs.filter(dimension__iexact=dimension)
+        return qs
 
 
 class PuntajeDetailView(BaseDetailView):
