@@ -482,3 +482,33 @@ class PuntajeDetailView(BaseDetailView):
     model = PuntajeDimension
     to_dict = staticmethod(s.puntaje_to_dict)
     fields = ("dimension", "puntaje")
+
+# =====================================================================
+# acciones: cálculo de resultados
+# =====================================================================
+
+from apps.scoring.service import ScoringService
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class EvaluacionCalcularView(View):
+    """
+    POST /api/evaluaciones/{id}/calcular/
+    Body opcional: {"interpretacion": "texto manual"}
+    """
+
+    @require_staff
+    def post(self, request, pk, *args, **kwargs):
+        evaluacion = get_object_or_404(Evaluacion, pk=pk)
+        try:
+            body = _payload(request)
+        except ValidationError as e:
+            return _json_error(e.messages[0])
+        interpretacion = body.get("interpretacion", "") or ""
+        try:
+            resultado = ScoringService.instance().calculate(
+                evaluacion, interpretacion=interpretacion
+            )
+        except Exception as e:
+            return _json_error(f"Error al calcular: {e}", status=500)
+        return JsonResponse(s.resultado_con_puntajes_to_dict(resultado))

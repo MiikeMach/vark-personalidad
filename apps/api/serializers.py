@@ -117,3 +117,15 @@ def puntaje_to_dict(obj):
         "dimension": obj.dimension,
         "puntaje": obj.puntaje,
     }
+
+def resultado_con_puntajes_to_dict(obj):
+    """Resultado con sus puntajes anidados (para el endpoint de cálculo)."""
+    return {
+        "id": obj.id,
+        "evaluacion": obj.evaluacion_id,
+        "preguntas_contestadas": obj.preguntas_contestadas,
+        "preguntas_omitidas": obj.preguntas_omitidas,
+        "interpretacion": obj.interpretacion,
+        "calculado_en": _iso(obj.calculado_en),
+        "puntajes": [puntaje_to_dict(p) for p in obj.puntajes.all()],
+    }
