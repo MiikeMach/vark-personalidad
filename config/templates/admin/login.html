@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/brujuela-login.css' %}">
+{% endblock %}
+
+{% block bodyclass %}login{% endblock %}
+
+{% block content %}
+<div class="bru-login-shell">
+  <section class="bru-login-copy" aria-label="Información de acceso">
+    <span class="bru-login-kicker">ESPACIO DE GESTIÓN</span>
+    <h1>Administra con una mirada <em>consciente.</em></h1>
+    <p>Actualiza grupos, estudiantes y resultados de los instrumentos VARK y de personalidad desde un solo lugar.</p>
+    <a href="{% url 'home' %}" class="bru-public-link">← Volver al sitio público</a>
+  </section>
+
+  <section class="bru-login-card">
+    <div class="bru-login-card-heading">
+      <span class="bru-login-icon">b.</span>
+      <div><strong>Iniciar sesión</strong><small>Acceso exclusivo para administradores</small></div>
+    </div>
+
+    {% if form.errors and not form.non_field_errors %}
+    <p class="errornote">{% translate "Corrige los datos indicados a continuación." %}</p>
+    {% endif %}
+    {% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+    <p class="errornote">{{ error }}</p>
+    {% endfor %}
+    {% endif %}
+
+    {% if user.is_authenticated %}
+    <p class="errornote">{% blocktranslate trimmed %}Ya tienes una sesión iniciada. No tienes permiso para ver esta página.{% endblocktranslate %}</p>
+    {% endif %}
+
+    <form action="{{ app_path }}" method="post" id="login-form">
+      {% csrf_token %}
+      <div class="bru-field">
+        {{ form.username.errors }}
+        {{ form.username.label_tag }}
+        {{ form.username }}
+      </div>
+      <div class="bru-field">
+        {{ form.password.errors }}
+        {{ form.password.label_tag }}
+        {{ form.password }}
+      </div>
+      {% if next %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+      <button type="submit" class="bru-submit">{% translate "Entrar al panel" %} <span>→</span></button>
+    </form>
+  </section>
+</div>
+{% endblock %}
