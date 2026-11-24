@@ -129,3 +129,33 @@ def resultado_con_puntajes_to_dict(obj):
         "calculado_en": _iso(obj.calculado_en),
         "puntajes": [puntaje_to_dict(p) for p in obj.puntajes.all()],
     }
+
+def opcion_brief_to_dict(obj):
+    return {
+        "id": obj.id,
+        "texto": obj.texto,
+        "dimension": obj.dimension,
+        "orden": obj.orden,
+    }
+
+
+def pregunta_completa_to_dict(obj):
+    return {
+        "id": obj.id,
+        "texto": obj.texto,
+        "orden": obj.orden,
+        "opciones": [opcion_brief_to_dict(o) for o in obj.opciones.all()],
+    }
+
+
+def cuestionario_completo_to_dict(obj):
+    return {
+        "id": obj.id,
+        "titulo": obj.titulo,
+        "descripcion": obj.descripcion,
+        "instrucciones": obj.instrucciones,
+        "tipo": obj.tipo,
+        "activo": obj.activo,
+        "creado_en": _iso(obj.creado_en),
+        "preguntas": [pregunta_completa_to_dict(p) for p in obj.preguntas.all()],
+    }

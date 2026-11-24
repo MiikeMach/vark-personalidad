@@ -17,6 +17,7 @@ urlpatterns = [
     # questionnaires
     path("cuestionarios/", views.CuestionarioListView.as_view()),
     path("cuestionarios/<int:pk>/", views.CuestionarioDetailView.as_view()),
+    path("cuestionarios/<int:pk>/completo/", views.CuestionarioCompletoView.as_view()),
     path("preguntas/", views.PreguntaListView.as_view()),
     path("preguntas/<int:pk>/", views.PreguntaDetailView.as_view()),
     path("opciones/", views.OpcionListView.as_view()),
@@ -24,7 +25,9 @@ urlpatterns = [
 
     # assessments
     path("evaluaciones/", views.EvaluacionListView.as_view()),
+    path("evaluaciones/iniciar/", views.EvaluacionIniciarView.as_view()),
     path("evaluaciones/<int:pk>/", views.EvaluacionDetailView.as_view()),
+    path("evaluaciones/<int:pk>/responder/", views.EvaluacionResponderView.as_view()),
     path("evaluaciones/<int:pk>/calcular/", views.EvaluacionCalcularView.as_view()),
     path("respuestas/", views.RespuestaListView.as_view()),
     path("respuestas/<int:pk>/", views.RespuestaDetailView.as_view()),

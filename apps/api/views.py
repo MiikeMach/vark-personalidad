@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from django.contrib.auth import authenticate, login, logout
 
 from apps.students.models import Grupo, Estudiante
@@ -512,3 +512,250 @@ class EvaluacionCalcularView(View):
         except Exception as e:
             return _json_error(f"Error al calcular: {e}", status=500)
         return JsonResponse(s.resultado_con_puntajes_to_dict(resultado))
+
+# =====================================================================
+# acciones: cuestionario completo + iniciar evaluación
+# =====================================================================
+
+@method_decorator(csrf_exempt, name="dispatch")
+class CuestionarioCompletoView(View):
+    """GET /api/cuestionarios/{id}/completo/  (público)"""
+
+    def get(self, request, pk, *args, **kwargs):
+        cuestionario = get_object_or_404(
+            Cuestionario.objects.prefetch_related(
+                Prefetch(
+                    "preguntas",
+                    queryset=Pregunta.objects.prefetch_related("opciones"),
+                )
+            ),
+            pk=pk,
+        )
+        return JsonResponse(s.cuestionario_completo_to_dict(cuestionario))
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class EvaluacionIniciarView(View):
+    """
+    POST /api/evaluaciones/iniciar/
+    Body: {"estudiante": <id>, "cuestionario": <id>}
+    Requiere autenticación (cualquier usuario activo en esta fase).
+    """
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return JsonResponse(
+                {"detail": "Autenticación requerida."}, status=401
+            )
+
+        try:
+            body = _payload(request)
+        except ValidationError as e:
+            return _json_error(e.messages[0])
+
+        estudiante_id = body.get("estudiante")
+        cuestionario_id = body.get("cuestionario")
+        if estudiante_id is None or cuestionario_id is None:
+            return _json_error("estudiante y cuestionario son obligatorios.")
+
+        estudiante = Estudiante.objects.filter(pk=estudiante_id).first()
+        if estudiante is None:
+            return _json_error("Estudiante no encontrado.", status=404)
+
+        cuestionario = Cuestionario.objects.filter(pk=cuestionario_id).first()
+        if cuestionario is None:
+            return _json_error("Cuestionario no encontrado.", status=404)
+        if not cuestionario.activo:
+            return _json_error("El cuestionario no está activo.")
+
+        # Reutilizar evaluación en progreso si existe (idempotente)
+        evaluacion = (
+            Evaluacion.objects
+            .filter(
+                estudiante=estudiante,
+                cuestionario=cuestionario,
+                estado=Evaluacion.Estado.EN_PROGRESO,
+            )
+            .order_by("-iniciada_en")
+            .first()
+        )
+        created = False
+        if evaluacion is None:
+            try:
+                with transaction.atomic():
+                    evaluacion = Evaluacion.objects.create(
+                        estudiante=estudiante,
+                        cuestionario=cuestionario,
+                        estado=Evaluacion.Estado.EN_PROGRESO,
+                    )
+                created = True
+            except (ValidationError, IntegrityError) as e:
+                return _json_error(str(e), status=400)
+
+        # Releer el cuestionario con anidamiento optimizado
+        cuestionario_full = get_object_or_404(
+            Cuestionario.objects.prefetch_related(
+                Prefetch(
+                    "preguntas",
+                    queryset=Pregunta.objects.prefetch_related("opciones"),
+                )
+            ),
+            pk=cuestionario.pk,
+        )
+
+        payload = {
+            "evaluacion": s.evaluacion_to_dict(evaluacion),
+            "cuestionario": s.cuestionario_completo_to_dict(cuestionario_full),
+        }
+        return JsonResponse(payload, status=201 if created else 200)
+
+# =====================================================================
+# acciones: envío bulk de respuestas
+# =====================================================================
+
+@method_decorator(csrf_exempt, name="dispatch")
+class EvaluacionResponderView(View):
+    """
+    POST /api/evaluaciones/{id}/responder/
+    Body:
+      {
+        "respuestas": [
+          {"pregunta": 10, "opciones": [40, 41]},
+          ...
+        ],
+        "calcular": false
+      }
+    """
+
+    def post(self, request, pk, *args, **kwargs):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return JsonResponse(
+                {"detail": "Autenticación requerida."}, status=401
+            )
+
+        evaluacion = Evaluacion.objects.filter(pk=pk).first()
+        if evaluacion is None:
+            return _json_error("Evaluación no encontrada.", status=404)
+        if evaluacion.estado != Evaluacion.Estado.EN_PROGRESO:
+            return _json_error(
+                "La evaluación ya está finalizada.", status=409
+            )
+
+        try:
+            body = _payload(request)
+        except ValidationError as e:
+            return _json_error(e.messages[0])
+
+        items = body.get("respuestas")
+        if not isinstance(items, list):
+            return _json_error("'respuestas' debe ser una lista.")
+        calcular = bool(body.get("calcular", False))
+
+        # -------- validación previa (sin escribir nada) --------
+        cuestionario = evaluacion.cuestionario
+        preguntas_ids = set(
+            cuestionario.preguntas.values_list("id", flat=True)
+        )
+        vistos = set()
+        errores = []
+        plan = []  # [(pregunta_id, [opcion_ids])]
+
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                errores.append(f"Item {idx}: debe ser un objeto.")
+                continue
+            pregunta_id = item.get("pregunta")
+            opciones = item.get("opciones", [])
+            if not isinstance(pregunta_id, int):
+                errores.append(f"Item {idx}: 'pregunta' debe ser entero.")
+                continue
+            if pregunta_id not in preguntas_ids:
+                errores.append(
+                    f"Item {idx}: pregunta {pregunta_id} no pertenece al cuestionario."
+                )
+                continue
+            if pregunta_id in vistos:
+                errores.append(f"Item {idx}: pregunta {pregunta_id} duplicada.")
+                continue
+            vistos.add(pregunta_id)
+            if not isinstance(opciones, list):
+                errores.append(f"Item {idx}: 'opciones' debe ser lista.")
+                continue
+            opciones_int = []
+            for o in opciones:
+                if not isinstance(o, int):
+                    errores.append(
+                        f"Item {idx}: opción {o!r} no es entero."
+                    )
+                    break
+                opciones_int.append(o)
+            else:
+                plan.append((pregunta_id, opciones_int))
+
+        # Validar que cada opción pertenezca a su pregunta
+        if not errores and plan:
+            pares = [(pid, oid) for pid, oids in plan for oid in oids]
+            if pares:
+                opciones_validas = set(
+                    Opcion.objects
+                    .filter(pregunta_id__in=[p for p, _ in pares])
+                    .values_list("pregunta_id", "id")
+                )
+                for pid, oid in pares:
+                    if (pid, oid) not in opciones_validas:
+                        errores.append(
+                            f"Opción {oid} no pertenece a la pregunta {pid}."
+                        )
+
+        if errores:
+            return JsonResponse({"detail": errores}, status=400)
+
+        # -------- escritura transaccional --------
+        guardadas = 0
+        omitidas = 0
+        try:
+            with transaction.atomic():
+                for pregunta_id, opcion_ids in plan:
+                    respuesta, _ = Respuesta.objects.update_or_create(
+                        evaluacion=evaluacion,
+                        pregunta_id=pregunta_id,
+                        defaults={},
+                    )
+                    # reemplazar selecciones
+                    SeleccionRespuesta.objects.filter(
+                        respuesta=respuesta
+                    ).delete()
+                    if opcion_ids:
+                        SeleccionRespuesta.objects.bulk_create(
+                            [
+                                SeleccionRespuesta(
+                                    respuesta=respuesta,
+                                    opcion_id=oid,
+                                )
+                                for oid in opcion_ids
+                            ]
+                        )
+                        guardadas += 1
+                    else:
+                        omitidas += 1
+        except IntegrityError as e:
+            return _json_error(str(e), status=409)
+
+        resultado_payload = None
+        if calcular:
+            try:
+                resultado = ScoringService.instance().calculate(evaluacion)
+                resultado_payload = s.resultado_con_puntajes_to_dict(resultado)
+            except Exception as e:
+                return _json_error(f"Error al calcular: {e}", status=500)
+
+        return JsonResponse(
+            {
+                "evaluacion": s.evaluacion_to_dict(evaluacion),
+                "guardadas": guardadas,
+                "omitidas": omitidas,
+                "resultado": resultado_payload,
+            }
+        )
