@@ -418,7 +418,61 @@ class SeleccionDetailView(BaseDetailView):
     to_dict = staticmethod(s.seleccion_to_dict)
     fields = ("respuesta", "opcion")
 
+def filtrar_resultados(request):
+    """Filtros compartidos por ResultadoListView y el endpoint PDF (#8, #14).
 
+    Devuelve (qs, error_response). error_response es None si todo OK.
+    """
+    qs = (
+        Resultado.objects
+        .select_related(
+            "evaluacion__estudiante__grupo",
+            "evaluacion__cuestionario",
+        )
+        .prefetch_related("puntajes")
+    )
+
+    evaluacion = _int_param(request, "evaluacion")
+    if evaluacion is not None:
+        qs = qs.filter(evaluacion_id=evaluacion)
+
+    estudiante = _int_param(request, "estudiante")
+    if estudiante is not None:
+        qs = qs.filter(evaluacion__estudiante_id=estudiante)
+
+    grupo = _int_param(request, "grupo")
+    if grupo is not None:
+        qs = qs.filter(evaluacion__estudiante__grupo_id=grupo)
+
+    cuestionario = _int_param(request, "cuestionario")
+    if cuestionario is not None:
+        qs = qs.filter(evaluacion__cuestionario_id=cuestionario)
+
+    tipo = _str_param(request, "tipo")
+    if tipo:
+        qs = qs.filter(evaluacion__cuestionario__tipo__iexact=tipo)
+
+    q = _str_param(request, "q")
+    if q:
+        qs = qs.filter(
+            Q(evaluacion__estudiante__matricula__icontains=q)
+            | Q(evaluacion__estudiante__nombres__icontains=q)
+            | Q(evaluacion__estudiante__apellidos__icontains=q)
+            | Q(evaluacion__estudiante__grupo__clave__icontains=q)
+            | Q(evaluacion__estudiante__grupo__nombre__icontains=q)
+        )
+
+    alcance = _str_param(request, "alcance")
+    if alcance is not None and alcance not in ("individual", "grupal", "total"):
+        return None, _json_error(
+            "Parámetro 'alcance' inválido (individual|grupal|total)."
+        )
+    if alcance == "individual" and estudiante is None and not q:
+        return qs.none(), None
+    if alcance == "grupal" and grupo is None and not q:
+        return qs.none(), None
+
+    return qs, None
 # =====================================================================
 # results
 # =====================================================================
@@ -443,43 +497,9 @@ class ResultadoListView(BaseListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-
-        evaluacion = _int_param(request, "evaluacion")
-        if evaluacion is not None:
-            qs = qs.filter(evaluacion_id=evaluacion)
-
-        estudiante = _int_param(request, "estudiante")
-        if estudiante is not None:
-            qs = qs.filter(evaluacion__estudiante_id=estudiante)
-
-        grupo = _int_param(request, "grupo")
-        if grupo is not None:
-            qs = qs.filter(evaluacion__estudiante__grupo_id=grupo)
-
-        tipo = _str_param(request, "tipo")
-        if tipo:
-            qs = qs.filter(evaluacion__cuestionario__tipo__iexact=tipo)
-
-        # #8: búsqueda por texto (matrícula/nombre/apellidos/grupo)
-        q = _str_param(request, "q")
-        if q:
-            qs = qs.filter(
-                Q(evaluacion__estudiante__matricula__icontains=q)
-                | Q(evaluacion__estudiante__nombres__icontains=q)
-                | Q(evaluacion__estudiante__apellidos__icontains=q)
-                | Q(evaluacion__estudiante__grupo__clave__icontains=q)
-                | Q(evaluacion__estudiante__grupo__nombre__icontains=q)
-            )
-
-        # #8: alcance semántico (opcional, retrocompatible)
-        alcance = _str_param(request, "alcance")
-        if alcance == "individual" and estudiante is None and not q:
-            return qs.none()
-        if alcance == "grupal" and grupo is None and not q:
-            return qs.none()
-        # alcance == "total" o None → sin filtro extra.
-
+        qs, error = filtrar_resultados(request)
+        if error is not None:
+            return Resultado.objects.none()
         return qs
 
 
@@ -923,3 +943,76 @@ class BuscarView(View):
             "estudiantes": [s.estudiante_to_dict(e) for e in estudiantes_qs],
             "grupos": [s.grupo_to_dict(g) for g in grupos_qs],
         })
+
+# =====================================================================
+# #14: PDF de ficha técnica (individual / grupal / total)
+# =====================================================================
+
+from django.http import HttpResponse
+from apps.api.pdf import construir_pdf_individual, construir_pdf_multiple
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ResultadoPdfView(View):
+    """GET /api/resultados/{pk}/pdf/  → ficha individual."""
+
+    def get(self, request, pk, *args, **kwargs):
+        resultado = get_object_or_404(
+            Resultado.objects
+            .select_related(
+                "evaluacion__estudiante__grupo",
+                "evaluacion__cuestionario",
+            )
+            .prefetch_related("puntajes"),
+            pk=pk,
+        )
+        contenido = construir_pdf_individual(resultado)
+        response = HttpResponse(contenido, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="ficha_resultado_{resultado.id}.pdf"'
+        )
+        return response
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ResultadosPdfView(View):
+    """GET /api/resultados/pdf/?…  → portada agregada + fichas individuales.
+
+    Acepta los mismos parámetros que ResultadoListView (q, alcance, grupo,
+    estudiante, tipo, cuestionario).
+    """
+
+    def get(self, request, *args, **kwargs):
+        qs, error = filtrar_resultados(request)
+        if error is not None:
+            return error
+
+        alcance = _str_param(request, "alcance") or "total"
+        tipo = _str_param(request, "tipo") or ""
+        if not tipo:
+            # Si no se especifica tipo, inferimos del primer resultado, o
+            # exigimos el parámetro para no mezclar VARK con personalidad.
+            primero = qs.first()
+            if primero is not None:
+                tipo = primero.evaluacion.cuestionario.tipo
+            else:
+                return _json_error(
+                    "Parámetro 'tipo' requerido (VARK|PERSONALIDAD) cuando no hay resultados."
+                )
+        if tipo not in ("VARK", "PERSONALIDAD"):
+            return _json_error("Parámetro 'tipo' inválido (VARK|PERSONALIDAD).")
+
+        # Si el qs mezclara tipos (no debería, por el filtro), lo restringimos.
+        qs = qs.filter(evaluacion__cuestionario__tipo=tipo)
+
+        contenido = construir_pdf_multiple(qs, alcance, tipo)
+
+        partes = ["ficha", alcance, tipo.lower()]
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            partes.append(f"grupo{grupo}")
+        nombre = "_".join(partes) + ".pdf"
+
+        response = HttpResponse(contenido, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return response

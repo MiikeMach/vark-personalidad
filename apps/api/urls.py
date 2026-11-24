@@ -38,6 +38,8 @@ urlpatterns = [
     path("buscar/", views.BuscarView.as_view()),
     path("resultados/", views.ResultadoListView.as_view()),
     path("resultados/agregados/", views.ResultadoAgregadosView.as_view()),
+    path("resultados/pdf/", views.ResultadosPdfView.as_view()),
+    path("resultados/<int:pk>/pdf/", views.ResultadoPdfView.as_view()),
     path("resultados/<int:pk>/", views.ResultadoDetailView.as_view()),
     path("dashboard/grupal/", views.DashboardGrupalView.as_view()),
     path("puntajes/", views.PuntajeListView.as_view()),
