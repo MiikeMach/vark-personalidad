@@ -25,6 +25,7 @@ urlpatterns = [
     # assessments
     path("evaluaciones/", views.EvaluacionListView.as_view()),
     path("evaluaciones/<int:pk>/", views.EvaluacionDetailView.as_view()),
+    path("evaluaciones/<int:pk>/calcular/", views.EvaluacionCalcularView.as_view()),
     path("respuestas/", views.RespuestaListView.as_view()),
     path("respuestas/<int:pk>/", views.RespuestaDetailView.as_view()),
     path("selecciones/", views.SeleccionListView.as_view()),
