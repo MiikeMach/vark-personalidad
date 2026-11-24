@@ -44,4 +44,6 @@ urlpatterns = [
     path("dashboard/grupal/", views.DashboardGrupalView.as_view()),
     path("puntajes/", views.PuntajeListView.as_view()),
     path("puntajes/<int:pk>/", views.PuntajeDetailView.as_view()),
+    # contacto (#11)
+    path("contacto/", views.ContactoView.as_view()),
 ]

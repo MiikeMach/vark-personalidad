@@ -1016,3 +1016,105 @@ class ResultadosPdfView(View):
         response = HttpResponse(contenido, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return response
+
+# =====================================================================
+# #11: formulario de contacto por correo
+# =====================================================================
+
+import logging
+
+from django.core.mail import send_mail
+from django.core.validators import validate_email
+from django.conf import settings as django_settings
+
+logger = logging.getLogger(__name__)
+
+
+def _validar_contacto(body):
+    """Devuelve (datos, errores). errores es {} si todo OK."""
+    errores = {}
+
+    nombre = (body.get("nombre") or "").strip()
+    if not nombre:
+        errores["nombre"] = ["Este campo es obligatorio."]
+    elif len(nombre) > 100:
+        errores["nombre"] = ["Máximo 100 caracteres."]
+
+    correo = (body.get("correo") or "").strip()
+    if not correo:
+        errores["correo"] = ["Este campo es obligatorio."]
+    else:
+        try:
+            validate_email(correo)
+        except Exception:
+            errores["correo"] = ["Introduce una dirección de correo válida."]
+
+    asunto = (body.get("asunto") or "").strip()
+    if not asunto:
+        errores["asunto"] = ["Este campo es obligatorio."]
+    elif len(asunto) > 150:
+        errores["asunto"] = ["Máximo 150 caracteres."]
+
+    mensaje = (body.get("mensaje") or "").strip()
+    if not mensaje:
+        errores["mensaje"] = ["Este campo es obligatorio."]
+    elif len(mensaje) < 10:
+        errores["mensaje"] = ["Mínimo 10 caracteres."]
+    elif len(mensaje) > 5000:
+        errores["mensaje"] = ["Máximo 5000 caracteres."]
+
+    if errores:
+        return None, errores
+    return {
+        "nombre": nombre,
+        "correo": correo,
+        "asunto": asunto,
+        "mensaje": mensaje,
+    }, {}
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ContactoView(View):
+    """POST /api/contacto/  → envía un correo de contacto.
+
+    Público. No persiste en BD (sin modelo). En desarrollo el correo se
+    imprime en consola (console.EmailBackend); en producción se configura
+    SMTP vía variables de entorno.
+    """
+
+    def post(self, request, *args, **kwargs):
+        try:
+            body = _payload(request)
+        except ValidationError as e:
+            return _json_error(e.messages[0])
+
+        datos, errores = _validar_contacto(body)
+        if errores:
+            return _json_error(errores)
+
+        asunto = f"[Contacto VARK] {datos['asunto']}"
+        cuerpo = (
+            f"Nombre: {datos['nombre']}\n"
+            f"Correo: {datos['correo']}\n\n"
+            f"{datos['mensaje']}\n"
+        )
+
+        try:
+            send_mail(
+                subject=asunto,
+                message=cuerpo,
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[django_settings.CONTACT_EMAIL],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Fallo al enviar correo de contacto.")
+            return _json_error(
+                "No se pudo enviar el mensaje. Intenta más tarde.",
+                status=500,
+            )
+
+        return JsonResponse(
+            {"detail": "Mensaje enviado correctamente."},
+            status=201,
+        )
