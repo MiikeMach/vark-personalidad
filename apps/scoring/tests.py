@@ -7,7 +7,8 @@ from apps.assessments.services import guardar_respuesta
 from apps.questionnaires.models import Cuestionario, Opcion, Pregunta
 from apps.scoring.services import calcular_puntajes_vark
 from apps.students.models import Estudiante, Grupo
-
+from apps.scoring.services import generar_perfil_personalidad
+from django.test import SimpleTestCase
 
 class CalcularPuntajesVarkTests(TestCase):
 
@@ -161,7 +162,6 @@ class CalcularPuntajesVarkTests(TestCase):
 from apps.assessments.services import guardar_respuesta_personalidad
 from apps.scoring.services import calcular_puntajes_personalidad
 
-
 class CalcularPuntajesPersonalidadTests(TestCase):
 
     @classmethod
@@ -282,3 +282,74 @@ class CalcularPuntajesPersonalidadTests(TestCase):
 
         with self.assertRaises(ValidationError):
             calcular_puntajes_personalidad(evaluacion_vark)
+
+
+class GenerarPerfilPersonalidadTests(SimpleTestCase):
+
+    def test_genera_perfil_entj(self):
+        puntajes = {
+            "E": 7, "I": 3,
+            "S": 2, "N": 8,
+            "T": 6, "F": 4,
+            "J": 9, "P": 1,
+        }
+
+        perfil = generar_perfil_personalidad(puntajes)
+
+        self.assertEqual(perfil, "ENTJ")
+
+    def test_genera_perfil_isfp(self):
+        puntajes = {
+            "E": 2, "I": 8,
+            "S": 7, "N": 3,
+            "T": 4, "F": 6,
+            "J": 1, "P": 9,
+        }
+
+        perfil = generar_perfil_personalidad(puntajes)
+
+        self.assertEqual(perfil, "ISFP")
+
+    def test_empate_devuelve_none(self):
+        puntajes = {
+            "E": 5, "I": 5,
+            "S": 2, "N": 8,
+            "T": 6, "F": 4,
+            "J": 9, "P": 1,
+        }
+
+        perfil = generar_perfil_personalidad(puntajes)
+
+        self.assertIsNone(perfil)
+
+    def test_datos_incompletos_devuelven_none(self):
+        puntajes = {
+            "E": 7,
+            "I": 3,
+        }
+
+        perfil = generar_perfil_personalidad(puntajes)
+
+        self.assertIsNone(perfil)
+
+    def test_rechaza_puntuaciones_negativas(self):
+        puntajes = {
+            "E": -1, "I": 11,
+            "S": 2, "N": 8,
+            "T": 6, "F": 4,
+            "J": 9, "P": 1,
+        }
+
+        with self.assertRaises(ValidationError):
+            generar_perfil_personalidad(puntajes)
+
+    def test_rechaza_valores_no_enteros(self):
+        puntajes = {
+            "E": "7", "I": 3,
+            "S": 2, "N": 8,
+            "T": 6, "F": 4,
+            "J": 9, "P": 1,
+        }
+
+        with self.assertRaises(ValidationError):
+            generar_perfil_personalidad(puntajes)

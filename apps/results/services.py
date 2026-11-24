@@ -8,6 +8,7 @@ from apps.results.models import Resultado, PuntajeDimension
 from apps.scoring.services import (
     calcular_puntajes_personalidad,
     calcular_puntajes_vark,
+    generar_perfil_personalidad,
 )
 
 
@@ -26,14 +27,23 @@ def guardar_resultado(evaluacion_id):
 
     if evaluacion.cuestionario.tipo == Cuestionario.Tipo.VARK:
         puntajes = calcular_puntajes_vark(evaluacion)
+        interpretacion = ""
 
     elif evaluacion.cuestionario.tipo == Cuestionario.Tipo.PERSONALIDAD:
         puntajes = calcular_puntajes_personalidad(evaluacion)
+
+        perfil = generar_perfil_personalidad(puntajes)
+
+        if perfil is None:
+            interpretacion = "Perfil no determinado"
+        else:
+            interpretacion = perfil
 
     else:
         raise ValidationError(
             "Tipo de cuestionario no compatible."
         )
+
 
     total_preguntas = Pregunta.objects.filter(
         cuestionario=evaluacion.cuestionario
@@ -59,7 +69,7 @@ def guardar_resultado(evaluacion_id):
         defaults={
             "preguntas_contestadas": contestadas,
             "preguntas_omitidas": omitidas,
-            "interpretacion": "",
+            "interpretacion": interpretacion,
         },
     )
 

@@ -1,4 +1,3 @@
-
 from django.test import TestCase
 
 from apps.assessments.models import (
@@ -226,3 +225,118 @@ class GuardarResultadoTests(TestCase):
         self.assertEqual(puntajes["A"], 1)
 
         self.assertEqual(resultado.puntajes.count(), 4)
+
+    def test_guarda_perfil_entj(self):
+        evaluacion = self.crear_evaluacion(self.personalidad)
+
+        distribuciones = [
+            ("E", "I", 7, 3),
+            ("S", "N", 2, 8),
+            ("T", "F", 6, 4),
+            ("J", "P", 9, 1),
+        ]
+
+        for orden, (primera, segunda, puntos_1, puntos_2) in enumerate(
+            distribuciones,
+            start=1,
+        ):
+            pregunta, opciones = self.crear_pregunta(
+                self.personalidad,
+                orden,
+                [primera, segunda],
+            )
+
+            self.seleccionar(
+                evaluacion,
+                pregunta,
+                opciones[primera],
+                puntos=puntos_1,
+            )
+
+            self.seleccionar(
+                evaluacion,
+                pregunta,
+                opciones[segunda],
+                puntos=puntos_2,
+            )
+
+        resultado = guardar_resultado(evaluacion.pk)
+
+        self.assertEqual(resultado.interpretacion, "ENTJ")
+        self.assertEqual(resultado.preguntas_contestadas, 4)
+        self.assertEqual(resultado.preguntas_omitidas, 0)
+        self.assertEqual(resultado.puntajes.count(), 8)
+
+    def test_guarda_perfil_no_determinado_por_empate(self):
+        evaluacion = self.crear_evaluacion(self.personalidad)
+
+        distribuciones = [
+            ("E", "I", 7, 3),
+            ("E", "I", 3, 7),
+            ("S", "N", 2, 8),
+            ("T", "F", 6, 4),
+            ("J", "P", 9, 1),
+        ]
+
+        for orden, (primera, segunda, puntos_1, puntos_2) in enumerate(
+            distribuciones,
+            start=1,
+        ):
+            pregunta, opciones = self.crear_pregunta(
+                self.personalidad,
+                orden,
+                [primera, segunda],
+            )
+
+            self.seleccionar(
+                evaluacion,
+                pregunta,
+                opciones[primera],
+                puntos=puntos_1,
+            )
+
+            self.seleccionar(
+                evaluacion,
+                pregunta,
+                opciones[segunda],
+                puntos=puntos_2,
+            )
+
+        resultado = guardar_resultado(evaluacion.pk)
+
+        self.assertEqual(
+            resultado.interpretacion,
+            "Perfil no determinado",
+        )
+        self.assertEqual(resultado.preguntas_contestadas, 5)
+
+    def test_guarda_perfil_no_determinado_si_faltan_dimensiones(self):
+        evaluacion = self.crear_evaluacion(self.personalidad)
+
+        pregunta, opciones = self.crear_pregunta(
+            self.personalidad,
+            1,
+            ["E", "I"],
+        )
+
+        self.seleccionar(
+            evaluacion,
+            pregunta,
+            opciones["E"],
+            puntos=7,
+        )
+
+        self.seleccionar(
+            evaluacion,
+            pregunta,
+            opciones["I"],
+            puntos=3,
+        )
+
+        resultado = guardar_resultado(evaluacion.pk)
+
+        self.assertEqual(
+            resultado.interpretacion,
+            "Perfil no determinado",
+        )
+        self.assertEqual(resultado.puntajes.count(), 8)
