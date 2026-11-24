@@ -78,6 +78,10 @@ class SeleccionRespuesta(models.Model):
         on_delete=models.PROTECT,
         related_name="selecciones",
     )
+    puntos = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         constraints = [
