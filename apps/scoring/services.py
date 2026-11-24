@@ -1,4 +1,3 @@
-
 from collections import Counter
 
 from django.core.exceptions import ValidationError
@@ -41,3 +40,40 @@ def calcular_puntajes_vark(evaluacion):
         dimension: conteo.get(dimension, 0)
         for dimension in dimensiones
     }
+
+
+def calcular_puntajes_personalidad(evaluacion):
+    """
+    Suma los puntos almacenados para cada una
+    de las ocho dimensiones de personalidad.
+    """
+
+    if evaluacion.cuestionario.tipo != Cuestionario.Tipo.PERSONALIDAD:
+        raise ValidationError(
+            "La evaluación no corresponde a personalidad."
+        )
+
+    dimensiones = ("E", "I", "S", "N", "T", "F", "J", "P")
+    puntajes = {dimension: 0 for dimension in dimensiones}
+
+    selecciones = SeleccionRespuesta.objects.filter(
+        respuesta__evaluacion=evaluacion
+    ).select_related("opcion")
+
+    for seleccion in selecciones:
+        dimension = seleccion.opcion.dimension
+        puntos = seleccion.puntos
+
+        if dimension not in puntajes:
+            raise ValidationError(
+                "La evaluación contiene una dimensión incompatible."
+            )
+
+        if puntos is None:
+            raise ValidationError(
+                "Una selección de personalidad no tiene puntos."
+            )
+
+        puntajes[dimension] += puntos
+
+    return puntajes

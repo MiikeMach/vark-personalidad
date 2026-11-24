@@ -156,3 +156,129 @@ class CalcularPuntajesVarkTests(TestCase):
 
         with self.assertRaises(ValidationError):
             calcular_puntajes_vark(evaluacion)
+
+
+from apps.assessments.services import guardar_respuesta_personalidad
+from apps.scoring.services import calcular_puntajes_personalidad
+
+
+class CalcularPuntajesPersonalidadTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        grupo = Grupo.objects.create(
+            clave="SCORE-PERS",
+            nombre="Grupo de personalidad",
+        )
+
+        estudiante = Estudiante.objects.create(
+            matricula="SCORE-PERS-001",
+            nombres="Alumno",
+            apellidos="Prueba",
+            grupo=grupo,
+        )
+
+        cls.cuestionario = Cuestionario.objects.create(
+            titulo="Personalidad de prueba",
+            tipo=Cuestionario.Tipo.PERSONALIDAD,
+        )
+
+        cls.evaluacion = Evaluacion.objects.create(
+            estudiante=estudiante,
+            cuestionario=cls.cuestionario,
+        )
+
+        cls.preguntas = {}
+        cls.opciones = {}
+
+        for orden, (dimension_1, dimension_2) in enumerate(
+            [("E", "I"), ("S", "N"), ("T", "F"), ("J", "P")],
+            start=1,
+        ):
+            pregunta = Pregunta.objects.create(
+                cuestionario=cls.cuestionario,
+                texto=f"Pregunta {orden}",
+                orden=orden,
+            )
+
+            opcion_1 = Opcion.objects.create(
+                pregunta=pregunta,
+                texto=f"Opción {dimension_1}",
+                dimension=dimension_1,
+                orden=1,
+            )
+
+            opcion_2 = Opcion.objects.create(
+                pregunta=pregunta,
+                texto=f"Opción {dimension_2}",
+                dimension=dimension_2,
+                orden=2,
+            )
+
+            cls.preguntas[dimension_1] = pregunta
+            cls.opciones[dimension_1] = opcion_1
+            cls.opciones[dimension_2] = opcion_2
+
+    def guardar_par(self, primera, segunda, puntos_1, puntos_2):
+        guardar_respuesta_personalidad(
+            self.evaluacion.pk,
+            self.preguntas[primera].pk,
+            self.opciones[primera].pk,
+            puntos_1,
+            self.opciones[segunda].pk,
+            puntos_2,
+        )
+
+    def test_sin_respuestas_devuelve_ceros(self):
+        resultado = calcular_puntajes_personalidad(self.evaluacion)
+
+        self.assertEqual(
+            resultado,
+            {
+                "E": 0, "I": 0,
+                "S": 0, "N": 0,
+                "T": 0, "F": 0,
+                "J": 0, "P": 0,
+            },
+        )
+
+    def test_calcula_las_ocho_dimensiones(self):
+        self.guardar_par("E", "I", 7, 3)
+        self.guardar_par("S", "N", 2, 8)
+        self.guardar_par("T", "F", 6, 4)
+        self.guardar_par("J", "P", 9, 1)
+
+        resultado = calcular_puntajes_personalidad(self.evaluacion)
+
+        self.assertEqual(
+            resultado,
+            {
+                "E": 7, "I": 3,
+                "S": 2, "N": 8,
+                "T": 6, "F": 4,
+                "J": 9, "P": 1,
+            },
+        )
+
+    def test_actualizar_respuesta_no_duplica_puntos(self):
+        self.guardar_par("E", "I", 7, 3)
+        self.guardar_par("E", "I", 8, 2)
+
+        resultado = calcular_puntajes_personalidad(self.evaluacion)
+
+        self.assertEqual(resultado["E"], 8)
+        self.assertEqual(resultado["I"], 2)
+
+    def test_rechaza_evaluacion_vark(self):
+        cuestionario_vark = Cuestionario.objects.create(
+            titulo="VARK de prueba",
+            tipo=Cuestionario.Tipo.VARK,
+        )
+
+        evaluacion_vark = Evaluacion.objects.create(
+            estudiante=self.evaluacion.estudiante,
+            cuestionario=cuestionario_vark,
+        )
+
+        with self.assertRaises(ValidationError):
+            calcular_puntajes_personalidad(evaluacion_vark)
