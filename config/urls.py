@@ -16,8 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from apps.dashboard.views import home
+
+admin.site.site_header = "Administración · Brújula"
+admin.site.site_title = "Brújula"
+admin.site.index_title = "Panel de gestión"
 
 urlpatterns = [
+    path("", home, name="home"),
     path("admin/", admin.site.urls),
     path("api/", include("apps.api.urls")),
 ]
