@@ -144,3 +144,128 @@ def validar_distribucion_personalidad(puntos_1, puntos_2):
         )
 
     return True
+
+
+def validar_par_personalidad(dimension_1, dimension_2):
+    """
+    Comprueba que dos dimensiones de personalidad
+    formen uno de los cuatro pares permitidos.
+    """
+
+    pares_permitidos = {
+        frozenset(("E", "I")),
+        frozenset(("S", "N")),
+        frozenset(("T", "F")),
+        frozenset(("J", "P")),
+    }
+
+    dimensiones = frozenset(
+        (dimension_1, dimension_2)
+    )
+
+    if dimensiones not in pares_permitidos:
+        raise ValidationError(
+            "Las dimensiones no forman un par "
+            "válido de personalidad."
+        )
+
+    return True
+
+
+@transaction.atomic
+def guardar_respuesta_personalidad(
+    evaluacion_id,
+    pregunta_id,
+    opcion_1_id,
+    puntos_1,
+    opcion_2_id,
+    puntos_2,
+):
+    """
+    Guarda o actualiza una distribución de puntos
+    entre dos dimensiones opuestas de personalidad.
+    """
+
+    evaluacion = (
+        Evaluacion.objects
+        .select_for_update()
+        .select_related("cuestionario")
+        .get(pk=evaluacion_id)
+    )
+
+    validar_evaluacion_editable(evaluacion)
+
+    if evaluacion.cuestionario.tipo != Cuestionario.Tipo.PERSONALIDAD:
+        raise ValidationError(
+            "La evaluación no corresponde a personalidad."
+        )
+
+    # Comprobar primero la distribución numérica.
+    validar_distribucion_personalidad(puntos_1, puntos_2)
+
+    # Rechazar identificadores duplicados.
+    if opcion_1_id == opcion_2_id:
+        raise ValidationError(
+            "Las dos opciones deben ser diferentes."
+        )
+
+    # Comprobar que la pregunta pertenece al cuestionario.
+    try:
+        pregunta = Pregunta.objects.get(
+            pk=pregunta_id,
+            cuestionario_id=evaluacion.cuestionario_id,
+        )
+    except Pregunta.DoesNotExist as exc:
+        raise ValidationError(
+            "La pregunta no pertenece al cuestionario."
+        ) from exc
+
+    opciones = list(
+        Opcion.objects.filter(
+            pregunta=pregunta,
+            pk__in=[opcion_1_id, opcion_2_id],
+        )
+    )
+
+    if len(opciones) != 2:
+        raise ValidationError(
+            "Las dos opciones deben pertenecer a la pregunta."
+        )
+
+    opciones_por_id = {
+        opcion.pk: opcion
+        for opcion in opciones
+    }
+
+    opcion_1 = opciones_por_id[opcion_1_id]
+    opcion_2 = opciones_por_id[opcion_2_id]
+
+    validar_par_personalidad(
+        opcion_1.dimension,
+        opcion_2.dimension,
+    )
+
+    respuesta, _ = Respuesta.objects.get_or_create(
+        evaluacion=evaluacion,
+        pregunta=pregunta,
+    )
+
+    # Reemplazar la distribución anterior.
+    respuesta.selecciones.all().delete()
+
+    SeleccionRespuesta.objects.bulk_create(
+        [
+            SeleccionRespuesta(
+                respuesta=respuesta,
+                opcion=opcion_1,
+                puntos=puntos_1,
+            ),
+            SeleccionRespuesta(
+                respuesta=respuesta,
+                opcion=opcion_2,
+                puntos=puntos_2,
+            ),
+        ]
+    )
+
+    return respuesta

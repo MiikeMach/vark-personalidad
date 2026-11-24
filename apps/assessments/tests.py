@@ -1,4 +1,3 @@
-
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
@@ -11,7 +10,8 @@ from apps.assessments.services import validar_evaluacion_editable
 from apps.assessments.models import Respuesta, SeleccionRespuesta
 from apps.assessments.services import guardar_respuesta
 from apps.assessments.services import validar_distribucion_personalidad
-
+from apps.assessments.services import validar_par_personalidad
+from apps.assessments.services import guardar_respuesta_personalidad
 
 class ValidarSeleccionesTests(TestCase):
     @classmethod
@@ -257,3 +257,187 @@ class ValidarDistribucionPersonalidadTests(SimpleTestCase):
     def test_rechaza_valores_booleanos(self):
         with self.assertRaises(ValidationError):
             validar_distribucion_personalidad(True, 9)
+
+class ValidarParPersonalidadTests(SimpleTestCase):
+
+    def test_acepta_par_extroversion_introversion(self):
+        self.assertTrue(validar_par_personalidad("E", "I"))
+
+    def test_acepta_par_sensacion_intuicion(self):
+        self.assertTrue(validar_par_personalidad("S", "N"))
+
+    def test_acepta_par_pensamiento_sentimiento(self):
+        self.assertTrue(validar_par_personalidad("T", "F"))
+
+    def test_acepta_par_juicio_percepcion(self):
+        self.assertTrue(validar_par_personalidad("J", "P"))
+
+    def test_acepta_par_en_orden_inverso(self):
+        self.assertTrue(validar_par_personalidad("I", "E"))
+
+    def test_rechaza_dimensiones_de_pares_diferentes(self):
+        with self.assertRaises(ValidationError):
+            validar_par_personalidad("E", "S")
+
+    def test_rechaza_dimensiones_repetidas(self):
+        with self.assertRaises(ValidationError):
+            validar_par_personalidad("E", "E")
+
+    def test_rechaza_dimensiones_vark(self):
+        with self.assertRaises(ValidationError):
+            validar_par_personalidad("V", "A")
+
+class GuardarRespuestaPersonalidadTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        grupo = Grupo.objects.create(
+            clave="PERS-TEST",
+            nombre="Grupo Personalidad",
+        )
+
+        estudiante = Estudiante.objects.create(
+            matricula="PERS-001",
+            nombres="Alumno",
+            apellidos="Personalidad",
+            grupo=grupo,
+        )
+
+        cls.cuestionario = Cuestionario.objects.create(
+            titulo="Personalidad de prueba",
+            tipo=Cuestionario.Tipo.PERSONALIDAD,
+        )
+
+        cls.evaluacion = Evaluacion.objects.create(
+            estudiante=estudiante,
+            cuestionario=cls.cuestionario,
+        )
+
+        cls.pregunta = Pregunta.objects.create(
+            cuestionario=cls.cuestionario,
+            texto="Pregunta de personalidad",
+            orden=1,
+        )
+
+        cls.opcion_e = Opcion.objects.create(
+            pregunta=cls.pregunta,
+            texto="Extroversión",
+            dimension="E",
+            orden=1,
+        )
+
+        cls.opcion_i = Opcion.objects.create(
+            pregunta=cls.pregunta,
+            texto="Introversión",
+            dimension="I",
+            orden=2,
+        )
+
+        cls.opcion_s = Opcion.objects.create(
+            pregunta=cls.pregunta,
+            texto="Sensación",
+            dimension="S",
+            orden=3,
+        )
+
+    def test_guarda_distribucion_7_3(self):
+        respuesta = guardar_respuesta_personalidad(
+            self.evaluacion.pk,
+            self.pregunta.pk,
+            self.opcion_e.pk, 7,
+            self.opcion_i.pk, 3,
+        )
+
+        self.assertEqual(respuesta.selecciones.count(), 2)
+
+        puntos = {
+            seleccion.opcion.dimension: seleccion.puntos
+            for seleccion in respuesta.selecciones.select_related("opcion")
+        }
+
+        self.assertEqual(puntos, {"E": 7, "I": 3})
+
+    def test_actualiza_distribucion_sin_duplicar(self):
+        guardar_respuesta_personalidad(
+            self.evaluacion.pk,
+            self.pregunta.pk,
+            self.opcion_e.pk, 7,
+            self.opcion_i.pk, 3,
+        )
+
+        respuesta = guardar_respuesta_personalidad(
+            self.evaluacion.pk,
+            self.pregunta.pk,
+            self.opcion_e.pk, 8,
+            self.opcion_i.pk, 2,
+        )
+
+        self.assertEqual(respuesta.selecciones.count(), 2)
+
+        puntos = {
+            seleccion.opcion.dimension: seleccion.puntos
+            for seleccion in respuesta.selecciones.select_related("opcion")
+        }
+
+        self.assertEqual(puntos, {"E": 8, "I": 2})
+
+    def test_distribucion_invalida_no_modifica_respuesta(self):
+        guardar_respuesta_personalidad(
+            self.evaluacion.pk,
+            self.pregunta.pk,
+            self.opcion_e.pk, 7,
+            self.opcion_i.pk, 3,
+        )
+
+        with self.assertRaises(ValidationError):
+            guardar_respuesta_personalidad(
+                self.evaluacion.pk,
+                self.pregunta.pk,
+                self.opcion_e.pk, 5,
+                self.opcion_i.pk, 5,
+            )
+
+        respuesta = Respuesta.objects.get(
+            evaluacion=self.evaluacion,
+            pregunta=self.pregunta,
+        )
+
+        puntos = {
+            seleccion.opcion.dimension: seleccion.puntos
+            for seleccion in respuesta.selecciones.select_related("opcion")
+        }
+
+        self.assertEqual(puntos, {"E": 7, "I": 3})
+
+    def test_rechaza_dimensiones_de_pares_distintos(self):
+        with self.assertRaises(ValidationError):
+            guardar_respuesta_personalidad(
+                self.evaluacion.pk,
+                self.pregunta.pk,
+                self.opcion_e.pk, 7,
+                self.opcion_s.pk, 3,
+            )
+
+        self.assertFalse(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion
+            ).exists()
+        )
+
+    def test_no_modifica_evaluacion_finalizada(self):
+        self.evaluacion.estado = Evaluacion.Estado.FINALIZADA
+        self.evaluacion.save(update_fields=["estado"])
+
+        with self.assertRaises(ValidationError):
+            guardar_respuesta_personalidad(
+                self.evaluacion.pk,
+                self.pregunta.pk,
+                self.opcion_e.pk, 7,
+                self.opcion_i.pk, 3,
+            )
+
+        self.assertFalse(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion
+            ).exists()
+        )
