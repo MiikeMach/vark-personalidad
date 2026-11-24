@@ -35,6 +35,7 @@ urlpatterns = [
     path("selecciones/<int:pk>/", views.SeleccionDetailView.as_view()),
 
     # results
+    path("buscar/", views.BuscarView.as_view()),
     path("resultados/", views.ResultadoListView.as_view()),
     path("resultados/agregados/", views.ResultadoAgregadosView.as_view()),
     path("resultados/<int:pk>/", views.ResultadoDetailView.as_view()),

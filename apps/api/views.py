@@ -434,20 +434,52 @@ class ResultadoListView(BaseListView):
     )
     ordering = "-calculado_en"
 
+    def get(self, request, *args, **kwargs):
+        alcance = _str_param(request, "alcance")
+        if alcance is not None and alcance not in ("individual", "grupal", "total"):
+            return _json_error(
+                "Parámetro 'alcance' inválido (individual|grupal|total)."
+            )
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
+
         evaluacion = _int_param(request, "evaluacion")
         if evaluacion is not None:
             qs = qs.filter(evaluacion_id=evaluacion)
+
         estudiante = _int_param(request, "estudiante")
         if estudiante is not None:
             qs = qs.filter(evaluacion__estudiante_id=estudiante)
+
         grupo = _int_param(request, "grupo")
         if grupo is not None:
             qs = qs.filter(evaluacion__estudiante__grupo_id=grupo)
+
         tipo = _str_param(request, "tipo")
         if tipo:
             qs = qs.filter(evaluacion__cuestionario__tipo__iexact=tipo)
+
+        # #8: búsqueda por texto (matrícula/nombre/apellidos/grupo)
+        q = _str_param(request, "q")
+        if q:
+            qs = qs.filter(
+                Q(evaluacion__estudiante__matricula__icontains=q)
+                | Q(evaluacion__estudiante__nombres__icontains=q)
+                | Q(evaluacion__estudiante__apellidos__icontains=q)
+                | Q(evaluacion__estudiante__grupo__clave__icontains=q)
+                | Q(evaluacion__estudiante__grupo__nombre__icontains=q)
+            )
+
+        # #8: alcance semántico (opcional, retrocompatible)
+        alcance = _str_param(request, "alcance")
+        if alcance == "individual" and estudiante is None and not q:
+            return qs.none()
+        if alcance == "grupal" and grupo is None and not q:
+            return qs.none()
+        # alcance == "total" o None → sin filtro extra.
+
         return qs
 
 
@@ -846,3 +878,48 @@ class DashboardGrupalView(View):
         if error is not None:
             return error
         return JsonResponse(agregar_resultados(qs, alcance, tipo))
+
+# =====================================================================
+# #8: búsqueda de alumnos y grupos para autocompletado
+# =====================================================================
+
+@method_decorator(csrf_exempt, name="dispatch")
+class BuscarView(View):
+    """GET /api/buscar/?q=...  → estudiantes y grupos que coinciden.
+
+    Público. Requiere q con al menos 2 caracteres.
+    """
+
+    LIMITE = 20
+    MIN_LEN = 2
+
+    def get(self, request, *args, **kwargs):
+        q = _str_param(request, "q")
+        if not q or len(q) < self.MIN_LEN:
+            return _json_error(
+                f"Parámetro 'q' requerido (mínimo {self.MIN_LEN} caracteres)."
+            )
+
+        estudiantes_qs = (
+            Estudiante.objects
+            .filter(
+                Q(matricula__icontains=q)
+                | Q(nombres__icontains=q)
+                | Q(apellidos__icontains=q)
+            )
+            .order_by("apellidos", "nombres")[: self.LIMITE]
+        )
+        grupos_qs = (
+            Grupo.objects
+            .filter(
+                Q(clave__icontains=q)
+                | Q(nombre__icontains=q)
+            )
+            .order_by("nombre")[: self.LIMITE]
+        )
+
+        return JsonResponse({
+            "q": q,
+            "estudiantes": [s.estudiante_to_dict(e) for e in estudiantes_qs],
+            "grupos": [s.grupo_to_dict(g) for g in grupos_qs],
+        })
