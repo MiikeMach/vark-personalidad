@@ -759,3 +759,90 @@ class EvaluacionResponderView(View):
                 "resultado": resultado_payload,
             }
         )
+# =====================================================================
+# agregaciones / dashboards (#4, #7, #15)
+# =====================================================================
+
+from apps.api.aggregations import agregar_resultados
+
+
+def _validar_alcance_tipo(request):
+    alcance = _str_param(request, "alcance")
+    tipo = _str_param(request, "tipo")
+    if alcance not in ("individual", "grupal", "total"):
+        return None, None, _json_error(
+            "Parámetro 'alcance' inválido (individual|grupal|total)."
+        )
+    if tipo not in ("VARK", "PERSONALIDAD"):
+        return None, None, _json_error(
+            "Parámetro 'tipo' inválido (VARK|PERSONALIDAD)."
+        )
+    return alcance, tipo, None
+
+
+def _resultados_filtrados(request, alcance, tipo):
+    """Devuelve (qs, error_response)."""
+    qs = (
+        Resultado.objects
+        .select_related("evaluacion__cuestionario", "evaluacion__estudiante")
+        .filter(evaluacion__cuestionario__tipo=tipo)
+    )
+
+    cuestionario = _int_param(request, "cuestionario")
+    if cuestionario is not None:
+        if not Cuestionario.objects.filter(pk=cuestionario).exists():
+            return None, _json_error("Cuestionario no encontrado.", status=404)
+        qs = qs.filter(evaluacion__cuestionario_id=cuestionario)
+
+    if alcance == "individual":
+        estudiante = _int_param(request, "estudiante")
+        if estudiante is None:
+            return None, _json_error(
+                "Parámetro 'estudiante' requerido para alcance=individual."
+            )
+        if not Estudiante.objects.filter(pk=estudiante).exists():
+            return None, _json_error("Estudiante no encontrado.", status=404)
+        qs = qs.filter(evaluacion__estudiante_id=estudiante)
+
+    elif alcance == "grupal":
+        grupo = _int_param(request, "grupo")
+        if grupo is None:
+            return None, _json_error(
+                "Parámetro 'grupo' requerido para alcance=grupal."
+            )
+        if not Grupo.objects.filter(pk=grupo).exists():
+            return None, _json_error("Grupo no encontrado.", status=404)
+        qs = qs.filter(evaluacion__estudiante__grupo_id=grupo)
+
+    # alcance == "total": sin filtro adicional
+
+    return qs, None
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ResultadoAgregadosView(View):
+    """GET /api/resultados/agregados/?alcance=…&tipo=…[&estudiante|grupo|cuestionario]"""
+
+    def get(self, request, *args, **kwargs):
+        alcance, tipo, error = _validar_alcance_tipo(request)
+        if error is not None:
+            return error
+        qs, error = _resultados_filtrados(request, alcance, tipo)
+        if error is not None:
+            return error
+        return JsonResponse(agregar_resultados(qs, alcance, tipo))
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class DashboardGrupalView(View):
+    """GET /api/dashboard/grupal/?grupo=…&tipo=… (alias de agregados/grupal)"""
+
+    def get(self, request, *args, **kwargs):
+        alcance = "grupal"
+        tipo = _str_param(request, "tipo")
+        if tipo not in ("VARK", "PERSONALIDAD"):
+            return _json_error("Parámetro 'tipo' inválido (VARK|PERSONALIDAD).")
+        qs, error = _resultados_filtrados(request, alcance, tipo)
+        if error is not None:
+            return error
+        return JsonResponse(agregar_resultados(qs, alcance, tipo))

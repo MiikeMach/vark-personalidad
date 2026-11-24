@@ -92,10 +92,22 @@ class ScoringService:
             .select_related("pregunta")
             .prefetch_related("selecciones__opcion")
         )
+
+        es_personalidad = (tipo == "PERSONALIDAD")
+
         for respuesta in respuestas:
             for seleccion in respuesta.selecciones.all():
                 dim = seleccion.opcion.dimension
-                if dim in scores:
+                if dim not in scores:
+                    continue
+                if es_personalidad:
+                    # En personalidad cada selección aporta la distribución
+                    # de 10 puntos validada en assessments.services.
+                    if seleccion.puntos is None:
+                        continue
+                    scores[dim] += seleccion.puntos
+                else:
+                    # VARK: cada selección cuenta 1 (multiselección).
                     scores[dim] += 1
         return scores
 

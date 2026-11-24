@@ -36,7 +36,9 @@ urlpatterns = [
 
     # results
     path("resultados/", views.ResultadoListView.as_view()),
+    path("resultados/agregados/", views.ResultadoAgregadosView.as_view()),
     path("resultados/<int:pk>/", views.ResultadoDetailView.as_view()),
+    path("dashboard/grupal/", views.DashboardGrupalView.as_view()),
     path("puntajes/", views.PuntajeListView.as_view()),
     path("puntajes/<int:pk>/", views.PuntajeDetailView.as_view()),
 ]
