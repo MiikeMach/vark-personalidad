@@ -555,26 +555,29 @@ from apps.scoring.service import ScoringService
 class EvaluacionCalcularView(View):
     """
     POST /api/evaluaciones/{id}/calcular/
-    Body opcional: {"interpretacion": "texto manual"}
+
+    Calcula y finaliza la evaluación. La interpretación se genera
+    automáticamente según el tipo de cuestionario; no se acepta texto manual.
     """
 
     @require_staff
     def post(self, request, pk, *args, **kwargs):
         evaluacion = get_object_or_404(Evaluacion, pk=pk)
         try:
-            body = _payload(request)
-        except ValidationError as e:
-            return _json_error(e.messages[0])
-        interpretacion = body.get("interpretacion", "") or ""
-        try:
-            resultado = ScoringService.instance().calculate(
-                evaluacion, interpretacion=interpretacion
-            )
-
+            ScoringService.instance().calculate(evaluacion)
         except ValidationError as e:
             return _json_error(e.messages[0], status=400)
-        except Exception as e:
-            return _json_error("Error interno al calcular la evaluación.", status=500)
+        except Exception:
+            return _json_error(
+                "Error interno al calcular la evaluación.", status=500
+            )
+
+        evaluacion.refresh_from_db()
+        resultado = Resultado.objects.get(evaluacion=evaluacion)
+        return JsonResponse({
+            "evaluacion": s.evaluacion_to_dict(evaluacion),
+            "resultado": s.resultado_con_puntajes_to_dict(resultado),
+        })
 
 
 # =====================================================================
