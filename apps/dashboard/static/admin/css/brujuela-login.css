@@ -1,0 +1,62 @@
+/* Brújula · Login | versión mejorada y responsive */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
+
+body.login{
+  background:radial-gradient(circle at 80% 20%,rgba(231,242,235,.9) 0,rgba(231,242,235,0) 28%),var(--admin-paper);
+  color:var(--admin-ink);font-family:'DM Sans',Arial,sans-serif;
+}
+body.login #container{background:transparent}
+body.login #header{height:68px;border-bottom:1px solid rgba(227,233,228,.8);background:rgba(255,255,255,.78)}
+body.login #nav-sidebar,body.login #site-name,body.login #user-tools{display:none}
+body.login .main{display:block}
+body.login #content{
+  width:100%;max-width:1120px;min-height:calc(100vh - 68px);margin:0 auto;padding:clamp(24px,4vw,38px) 24px;
+  background:transparent;display:flex;align-items:center;justify-content:center;
+}
+body.login #content h1{display:none}
+.bru-login-shell{
+  width:100%;min-height:500px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);
+  align-items:center;gap:clamp(24px,5vw,70px);
+}
+.bru-login-copy{
+  max-width:550px;min-height:390px;padding:clamp(30px,5vw,58px);border-radius:16px;background:#2c7059;color:#fff;
+  position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
+}
+.bru-login-copy::after{content:'b.';position:absolute;right:-10px;bottom:-75px;font-family:'DM Serif Display',Georgia,serif;font-size:clamp(150px,18vw,230px);color:rgba(255,255,255,.055);line-height:1;pointer-events:none}
+.bru-login-kicker{font-size:9px;letter-spacing:1.7px;color:#bad1c2;font-weight:700}
+.bru-login-copy h1{display:block!important;max-width:430px;font-size:clamp(30px,3.5vw,38px)!important;line-height:1.12;letter-spacing:-1.4px!important;color:#fff!important;margin:20px 0 14px!important}
+.bru-login-copy h1 em{font-family:'DM Serif Display',Georgia,serif;color:#dfc59c;font-weight:400}
+.bru-login-copy p{max-width:410px;color:#d0e0d5;font-size:12px;line-height:1.7;margin-bottom:0}
+.bru-public-link{position:absolute;bottom:clamp(22px,4vw,38px);z-index:1;color:#d9e8df!important;font-size:10px;font-weight:700;text-decoration:none}
+.bru-login-card{width:100%;max-width:380px;background:#fff;border:1px solid var(--admin-line);border-radius:13px;padding:clamp(22px,3vw,28px);box-shadow:0 18px 45px rgba(32,64,49,.06);justify-self:end}
+.bru-login-card-heading{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.bru-login-icon{width:43px;height:43px;flex:0 0 43px;border-radius:12px;display:grid;place-items:center;background:var(--admin-mint);color:var(--admin-green);font-family:'DM Serif Display',Georgia,serif;font-size:27px}
+.bru-login-card-heading strong,.bru-login-card-heading small{display:block}
+.bru-login-card-heading strong{font-size:17px}
+.bru-login-card-heading small{margin-top:4px;color:#94a098;font-size:9px}
+.bru-field{margin-bottom:15px}
+.bru-field label{display:block;margin:0 0 7px;color:#5e6d64;font-size:10px;font-weight:700}
+.bru-field input{width:100%;height:43px;border:1px solid #dfe6e1;border-radius:8px;padding:0 12px;color:var(--admin-ink);font-size:12px;background:#fff}
+.bru-field input:focus{outline:0;border-color:#96bda5;box-shadow:0 0 0 3px #e7f1ea}
+.bru-submit{width:100%;min-height:43px;border:0;border-radius:8px;margin-top:7px;padding:10px 14px;background:var(--admin-green);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:15px;cursor:pointer;transition:background .18s ease,transform .18s ease}
+.bru-submit:hover{background:var(--admin-green-dark)}
+.bru-submit:active{transform:translateY(1px)}
+:where(.bru-public-link,.bru-submit,.bru-field input):focus-visible{outline:2px solid var(--admin-green);outline-offset:3px}
+@media(max-width:820px){
+  body.login #content{min-height:calc(100vh - 68px);align-items:flex-start;padding:24px 20px}
+  .bru-login-shell{grid-template-columns:minmax(0,1fr);gap:18px;padding-top:12px;min-height:unset}
+  .bru-login-copy{min-height:250px;padding:30px;max-width:none}
+  .bru-login-copy h1{font-size:30px!important;max-width:360px}
+  .bru-login-copy p{max-width:400px}
+  .bru-public-link{bottom:24px}
+  .bru-login-card{max-width:none;justify-self:stretch}
+}
+@media(max-width:480px){
+  body.login #content{padding:18px 14px}
+  .bru-login-shell{gap:14px}
+  .bru-login-copy{min-height:220px;padding:24px;border-radius:13px}
+  .bru-login-copy h1{font-size:27px!important;letter-spacing:-.8px!important;margin:14px 0 10px!important}
+  .bru-login-copy p{font-size:11px}
+  .bru-login-card{padding:20px;border-radius:12px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}

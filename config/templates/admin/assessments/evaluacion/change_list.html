@@ -1,0 +1,59 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+<details class="bru-evaluation" id="bru-evaluation">
+  <summary><span>Realizar una evaluación de prueba</span><small>Responder y obtener un perfil orientativo</small></summary>
+  <div class="bru-evaluation-body">
+    <p class="bru-evaluation-notice">Esta prueba no guarda resultados y no sustituye un instrumento validado.</p>
+    <noscript><p>Activa JavaScript para utilizar la evaluación de prueba.</p></noscript>
+    <div class="bru-evaluation-section-heading">
+      <span class="bru-builder-step">01 · ELIGE UN CUESTIONARIO</span>
+      <h2>¿Qué deseas evaluar?</h2>
+      <p>Usa un ejemplo o selecciona un archivo JSON compatible.</p>
+    </div>
+    <div class="bru-evaluation-setup">
+      <div class="bru-evaluation-source">
+        <label for="bru-evaluation-example">Ejemplo ficticio</label>
+        <div class="bru-evaluation-example-controls">
+          <select id="bru-evaluation-example">
+            <option value="VARK">Aprendizaje · VARK</option>
+            <option value="PERSONALIDAD">Personalidad</option>
+          </select>
+          <button type="button" class="bru-builder-secondary" id="bru-evaluation-load">Usar ejemplo</button>
+        </div>
+      </div>
+      <div class="bru-evaluation-source">
+        <label for="bru-evaluation-file">Borrador del constructor</label>
+        <input id="bru-evaluation-file" type="file" accept=".json,application/json">
+        <small>Selecciona un archivo JSON compatible.</small>
+      </div>
+    </div>
+    <p class="bru-evaluation-status" id="bru-evaluation-status" role="status" aria-live="polite"></p>
+    <form id="bru-evaluation-form" hidden>
+      <div class="bru-evaluation-form-heading">
+        <span class="bru-builder-step">02 · RESPONDE EL CUESTIONARIO</span>
+        <h2 id="bru-evaluation-title"></h2>
+        <p id="bru-evaluation-instructions"></p>
+        <div class="bru-evaluation-progress">
+          <span id="bru-evaluation-progress-label"></span>
+          <div class="bru-evaluation-progress-track" role="progressbar" aria-label="Preguntas respondidas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="bru-evaluation-progress-fill"></span>
+          </div>
+        </div>
+      </div>
+      <div id="bru-evaluation-questions"></div>
+      <button type="submit" class="bru-builder-primary">Ver mi perfil</button>
+    </form>
+    <section class="bru-evaluation-result" id="bru-evaluation-result" aria-labelledby="bru-evaluation-result-title" hidden>
+      <span class="bru-builder-step">03 · RESULTADO</span>
+      <h2 id="bru-evaluation-result-title">Tu perfil orientativo</h2>
+      <div id="bru-evaluation-result-content"></div>
+      <p>Esta interpretación es una demostración educativa, no un diagnóstico ni una evaluación clínica.</p>
+    </section>
+  </div>
+</details>
+{{ block.super }}
+<script src="{% static 'admin/js/brujuela-ejemplos.js' %}?v=1" defer></script>
+<script src="{% static 'admin/js/brujuela-evaluacion.js' %}?v=2" defer></script>
+{% endblock %}

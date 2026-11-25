@@ -120,12 +120,18 @@ class BaseListView(View):
     ordering = None
 
     def get_queryset(self, request):
-        return self.model.objects.all()
+        qs = self.model.objects.all()
+        if self.ordering:
+            if isinstance(self.ordering, (tuple, list)):
+                qs = qs.order_by(*self.ordering)
+            else:
+                qs = qs.order_by(self.ordering)
+        return qs
 
     def get(self, request, *args, **kwargs):
         qs = self.get_queryset(request)
-        if self.ordering:
-            qs = qs.order_by(self.ordering)
+        data = [self.to_dict(o) for o in qs]
+        return JsonResponse(data, safe=False)
         data = [self.to_dict(o) for o in qs]
         return JsonResponse(data, safe=False)
 
@@ -237,6 +243,7 @@ class EstudianteListView(BaseListView):
     model = Estudiante
     to_dict = staticmethod(s.estudiante_to_dict)
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
+
     ordering = ("apellidos", "nombres")
 
     def get_queryset(self, request):
@@ -418,6 +425,7 @@ class SeleccionDetailView(BaseDetailView):
     to_dict = staticmethod(s.seleccion_to_dict)
     fields = ("respuesta", "opcion")
 
+
 def filtrar_resultados(request):
     """Filtros compartidos por ResultadoListView y el endpoint PDF (#8, #14).
 
@@ -487,6 +495,7 @@ class ResultadoListView(BaseListView):
         "interpretacion",
     )
     ordering = "-calculado_en"
+
 
     def get(self, request, *args, **kwargs):
         alcance = _str_param(request, "alcance")
@@ -561,9 +570,12 @@ class EvaluacionCalcularView(View):
             resultado = ScoringService.instance().calculate(
                 evaluacion, interpretacion=interpretacion
             )
+
         except ValidationError as e:
             return _json_error(e.messages[0], status=400)
-        return JsonResponse(s.resultado_con_puntajes_to_dict(resultado))
+        except Exception as e:
+            return _json_error("Error interno al calcular la evaluación.", status=500)
+
 
 # =====================================================================
 # acciones: cuestionario completo + iniciar evaluación
