@@ -81,6 +81,31 @@ class FlujoEvaluacionAPITests(TestCase):
             data=json.dumps({}), content_type="application/json")
         self.assertEqual(respuesta.status_code, 400)
 
+    def test_calcular_endpoint_devuelve_resultado(self):
+        evaluacion = self.nuevo(self.vark)
+        from apps.assessments.services import guardar_respuesta
+        guardar_respuesta(
+            evaluacion.pk,
+            self.pregunta_v.pk,
+            [self.opcion_v.pk, self.opcion_a.pk],
+        )
+
+        respuesta = self.client.post(
+            f"/api/evaluaciones/{evaluacion.pk}/calcular/",
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        payload = respuesta.json()
+        self.assertIn("evaluacion", payload)
+        self.assertIn("resultado", payload)
+        self.assertIn("puntajes", payload["resultado"])
+        self.assertEqual(payload["evaluacion"]["estado"], Evaluacion.Estado.FINALIZADA)
+        puntajes = {p["dimension"]: p["puntaje"] for p in payload["resultado"]["puntajes"]}
+        self.assertEqual(puntajes["V"], 1)
+        self.assertEqual(puntajes["A"], 1)
+
     def test_usuario_sin_permisos_no_modifica(self):
         usuario = get_user_model().objects.create_user(username="usuario_api_test", password="x")
         self.client.force_login(usuario)
