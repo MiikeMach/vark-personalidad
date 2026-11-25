@@ -1,4 +1,3 @@
-
 from django.core.exceptions import ValidationError
 from apps.assessments.models import Evaluacion
 
@@ -89,6 +88,12 @@ def guardar_respuesta(evaluacion_id, pregunta_id, opcion_ids):
     )
 
     validar_evaluacion_editable(evaluacion)
+
+    if evaluacion.cuestionario.tipo != Cuestionario.Tipo.VARK:
+        raise ValidationError(
+            "Este servicio solo admite respuestas VARK. "
+            "Para personalidad utiliza guardar_respuesta_personalidad()."
+        )
 
     opciones = validar_selecciones(
         evaluacion,
