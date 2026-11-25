@@ -1,0 +1,22 @@
+{% extends "admin/change_list.html" %}
+{% load admin_urls %}
+
+{% block content_title %}<h1>Roles de acceso</h1>{% endblock %}
+
+{% block content %}
+<section class="bru-access-help" aria-labelledby="bru-roles-title">
+  <strong id="bru-roles-title">Un rol agrupa permisos para una o varias cuentas</strong>
+  <p>La lista inferior muestra los roles que ya existen. No son los grupos escolares.</p>
+  <p>Por ejemplo, un rol <b>Administrador</b> podría gestionar la información y un rol <b>Consulta</b> podría ver resultados. Son solo ejemplos: su acceso real depende de los permisos que se les asignen.</p>
+</section>
+{{ block.super }}
+{% endblock %}
+
+{% block object-tools-items %}
+  {% if has_add_permission %}
+  <li>
+    {% url cl.opts|admin_urlname:'add' as add_url %}
+    <a href="{% add_preserved_filters add_url is_popup to_field %}" class="addlink">Agregar rol</a>
+  </li>
+  {% endif %}
+{% endblock %}

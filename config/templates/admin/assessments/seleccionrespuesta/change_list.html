@@ -1,0 +1,43 @@
+{% extends "admin/change_list.html" %}
+{% load admin_urls %}
+
+{% block title %}Opciones seleccionadas · Brújula{% endblock %}
+{% block content_title %}<h1>Opciones seleccionadas</h1>{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Inicio</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=cl.opts.app_label %}">{{ cl.opts.app_config.verbose_name }}</a>
+  &rsaquo; Opciones seleccionadas
+</div>
+{% endblock %}
+
+{% block object-tools-items %}
+  {% if has_add_permission %}
+  <li>
+    {% url cl.opts|admin_urlname:'add' as add_url %}
+    <a href="{% add_preserved_filters add_url is_popup to_field %}" class="addlink">Agregar opción seleccionada</a>
+  </li>
+  {% endif %}
+{% endblock %}
+
+{% block result_list %}
+  {{ block.super }}
+  {% if not is_popup %}
+  <template id="bru-selection-details">
+    {% for selection in cl.result_list %}
+    <div>
+      <div class="bru-selection-detail" data-column="respuesta">
+        <strong>{{ selection.respuesta.evaluacion.estudiante }}</strong>
+        <span>{{ selection.respuesta.pregunta.cuestionario.titulo }}</span>
+        <span>{{ selection.respuesta.pregunta.texto }}</span>
+      </div>
+      <div class="bru-selection-detail" data-column="opcion">
+        <strong>{{ selection.opcion.texto }}</strong>
+        <span>{{ selection.opcion.get_dimension_display }}{% if selection.puntos is not None %} · {{ selection.puntos }} punto{{ selection.puntos|pluralize }}{% endif %}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </template>
+  {% endif %}
+{% endblock %}
