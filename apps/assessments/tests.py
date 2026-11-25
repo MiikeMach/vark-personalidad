@@ -164,6 +164,22 @@ class ValidarSeleccionesTests(TestCase):
         )
         self.assertEqual(respuesta.selecciones.count(), 2)
 
+    def test_guardar_respuesta_rechaza_personalidad(self):
+        with self.assertRaises(ValidationError):
+            guardar_respuesta(
+                self.evaluacion_personalidad.pk,
+                self.pregunta_personalidad.pk,
+                [self.opcion_e.pk, self.opcion_i.pk],
+            )
+
+        self.assertFalse(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion_personalidad,
+                pregunta=self.pregunta_personalidad,
+            ).exists()
+        )
+
+
     def test_actualizar_respuesta_reemplaza_selecciones(self):
         guardar_respuesta(
             self.evaluacion_vark.pk,

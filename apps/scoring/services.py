@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 
 from apps.assessments.models import SeleccionRespuesta
 from apps.questionnaires.models import Cuestionario
-
+from django.core.exceptions import ValidationError
 
 def calcular_puntajes_vark(evaluacion):
     """
@@ -77,3 +77,44 @@ def calcular_puntajes_personalidad(evaluacion):
         puntajes[dimension] += puntos
 
     return puntajes
+
+def generar_perfil_personalidad(puntajes):
+    """
+    Genera un perfil de cuatro letras a partir
+    de las puntuaciones de personalidad.
+
+    Devuelve None si faltan datos o hay empates.
+    """
+
+    pares = [
+        ("E", "I"),
+        ("S", "N"),
+        ("T", "F"),
+        ("J", "P"),
+    ]
+
+    perfil = []
+
+    for primera, segunda in pares:
+        puntos_1 = puntajes.get(primera, 0)
+        puntos_2 = puntajes.get(segunda, 0)
+
+        if (
+            type(puntos_1) is not int
+            or type(puntos_2) is not int
+            or puntos_1 < 0
+            or puntos_2 < 0
+        ):
+            raise ValidationError(
+                "Las puntuaciones de personalidad son inválidas."
+            )
+
+        if puntos_1 == puntos_2:
+            return None
+
+        if puntos_1 > puntos_2:
+            perfil.append(primera)
+        else:
+            perfil.append(segunda)
+
+    return "".join(perfil)
