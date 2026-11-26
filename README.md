@@ -7,6 +7,12 @@ En Administración → Roles de acceso, selecciona una plantilla y revisa sus pe
 
 Los permisos del rol no son necesariamente todos los permisos de una cuenta: puede tener otros roles o permisos directos. El acceso al panel se configura por separado en la cuenta.
 
+Al crear o editar usuarios desde Administración, el nombre de usuario admite espacios además de letras, números y los caracteres `@`, `.`, `+`, `-` y `_`. Para iniciar sesión, escribe el mismo nombre.
+
+En la ficha de edición del usuario se pueden seleccionar sus roles y configurar el acceso al panel sin salir del formulario. Los permisos directos y la opción de superusuario están en «Permisos avanzados»; los permisos directos se suman a los de sus roles.
+
+Al agregar un usuario se pueden registrar sus datos personales y elegir roles existentes. Quienes pueden consultar roles pueden revisar sus permisos desde el formulario antes de asignarlos. El usuario hereda los permisos de esos roles; el acceso al panel debe activarse por separado. La fecha de creación se registra automáticamente.
+
 ## Tablero de resultados
 
 El tablero general está en Administración y se muestra a quienes pueden consultar o modificar resultados. La API de consulta mantiene sus permisos actuales y sigue siendo pública; mover el tablero no restringe el acceso directo a los datos.
@@ -39,7 +45,13 @@ Para integrarlo después se necesita un backend que valide y guarde el cuestiona
 
 ## Evaluación de prueba
 
-En Administración → Evaluaciones se puede responder un ejemplo ficticio o cargar un archivo JSON compatible. La simulación identifica las preferencias más frecuentes al completar el cuestionario; en personalidad señala los empates y las dimensiones sin información. El perfil es orientativo, no está basado en un instrumento validado y no se guarda. Para una aplicación real se necesitan los instrumentos, sus criterios de interpretación y un backend que valide y registre la evaluación completa.
+En Administración → Evaluaciones se puede responder un ejemplo ficticio o cargar un archivo JSON compatible. La simulación identifica las preferencias más frecuentes al completar el cuestionario; en personalidad señala los empates y las dimensiones sin información. El perfil es orientativo, no está basado en un instrumento validado y no se guarda. Para registrar una evaluación se usa la sección Instrumentos del sitio y un cuestionario configurado en la base de datos. Para una aplicación real se necesitan instrumentos y criterios de interpretación validados.
+
+En la evaluación registrada de personalidad, cada pregunta debe tener dos opciones de dimensiones opuestas (E/I, S/N, T/F o J/P). Se distribuyen 10 puntos entre ambas, sin reparto 5/5; el sistema guarda las dos puntuaciones y calcula el resultado al finalizar.
+
+Para responder, un administrador registra el grupo y el perfil del estudiante. En Instrumentos, el estudiante selecciona su perfil activo y un cuestionario, sin crear una cuenta. La evaluación iniciada queda asociada a la sesión del navegador para su envío; el personal puede responder cualquier evaluación. Si se pierde la sesión, debe iniciarse una nueva evaluación.
+
+Las solicitudes de inicio y cierre de sesión, inicio de evaluación y envío de respuestas requieren protección CSRF. Los clientes de la API deben obtener el token CSRF y enviarlo en `X-CSRFToken`. Como la selección no verifica la identidad, cualquiera puede elegir el perfil de otra persona y registrar respuestas en su nombre. Los endpoints de consulta existentes siguen siendo públicos y no restringen la lectura de resultados o datos de estudiantes. El campo de vínculo a usuario existente se conserva en la base por compatibilidad, pero no se usa en este flujo.
 
 ## Pruebas de interfaz
 

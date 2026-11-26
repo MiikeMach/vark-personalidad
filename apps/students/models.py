@@ -1,4 +1,5 @@
 
+from django.conf import settings
 from django.db import models
 
 
@@ -18,6 +19,13 @@ class Grupo(models.Model):
 
 
 class Estudiante(models.Model):
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="perfil_estudiante",
+        null=True,
+        blank=True,
+    )
     matricula = models.CharField(max_length=30, unique=True)
     nombres = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)

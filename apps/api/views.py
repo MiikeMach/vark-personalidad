@@ -63,7 +63,6 @@ def _str_param(request, name):
 # Auth (login/logout/me)
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class LoginView(View):
     """POST /api/auth/login/  {"username": "...", "password": "..."}"""
 
@@ -85,7 +84,6 @@ class LoginView(View):
         return JsonResponse({"user": user_to_dict(user)})
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class LogoutView(View):
     """POST /api/auth/logout/"""
 
@@ -601,21 +599,16 @@ class CuestionarioCompletoView(View):
         return JsonResponse(s.cuestionario_completo_to_dict(cuestionario))
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class EvaluacionIniciarView(View):
     """
     POST /api/evaluaciones/iniciar/
     Body: {"estudiante": <id>, "cuestionario": <id>}
-    Requiere autenticación (cualquier usuario activo en esta fase).
+    Cualquier visitante puede seleccionar un estudiante activo. Las
+    evaluaciones de visitantes quedan asociadas a su sesión de navegador.
     """
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        if not user or not user.is_authenticated:
-            return JsonResponse(
-                {"detail": "Autenticación requerida."}, status=401
-            )
-
         try:
             body = _payload(request)
         except ValidationError as e:
@@ -629,6 +622,8 @@ class EvaluacionIniciarView(View):
         estudiante = Estudiante.objects.filter(pk=estudiante_id).first()
         if estudiante is None:
             return _json_error("Estudiante no encontrado.", status=404)
+        if not user.is_staff and not estudiante.activo:
+            return _json_error("El estudiante no está activo.", status=403)
 
         cuestionario = Cuestionario.objects.filter(pk=cuestionario_id).first()
         if cuestionario is None:
@@ -636,17 +631,16 @@ class EvaluacionIniciarView(View):
         if not cuestionario.activo:
             return _json_error("El cuestionario no está activo.")
 
-        # Reutilizar evaluación en progreso si existe (idempotente)
-        evaluacion = (
-            Evaluacion.objects
-            .filter(
-                estudiante=estudiante,
-                cuestionario=cuestionario,
-                estado=Evaluacion.Estado.EN_PROGRESO,
-            )
-            .order_by("-iniciada_en")
-            .first()
+        evaluaciones = Evaluacion.objects.filter(
+            estudiante=estudiante,
+            cuestionario=cuestionario,
+            estado=Evaluacion.Estado.EN_PROGRESO,
         )
+        if not user.is_staff:
+            evaluaciones = evaluaciones.filter(
+                pk__in=request.session.get("evaluaciones_publicas", [])
+            )
+        evaluacion = evaluaciones.order_by("-iniciada_en").first()
         created = False
         if evaluacion is None:
             try:
@@ -659,6 +653,10 @@ class EvaluacionIniciarView(View):
                 created = True
             except (ValidationError, IntegrityError) as e:
                 return _json_error(str(e), status=400)
+
+        if not user.is_staff and created:
+            ids = request.session.get("evaluaciones_publicas", [])
+            request.session["evaluaciones_publicas"] = [*ids, evaluacion.pk]
 
         # Releer el cuestionario con anidamiento optimizado
         cuestionario_full = get_object_or_404(
@@ -681,7 +679,6 @@ class EvaluacionIniciarView(View):
 # acciones: envío bulk de respuestas
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class EvaluacionResponderView(View):
     """POST /api/evaluaciones/{id}/responder/.
 
@@ -689,12 +686,12 @@ class EvaluacionResponderView(View):
     Personalidad: {"respuestas": [{"pregunta": 1, "selecciones":
       [{"opcion": 2, "puntos": 7}, {"opcion": 3, "puntos": 3}]}], "calcular": true}
 
-    Por seguridad esta ruta es administrativa hasta definir propiedad de
-    evaluaciones para cuentas de estudiantes.
+    El personal puede responder cualquier evaluación; los visitantes solo
+    pueden responder las que iniciaron en su sesión de navegador.
     """
 
-    @require_staff
     def post(self, request, pk, *args, **kwargs):
+        user = request.user
         try:
             body = _payload(request)
         except ValidationError as exc:
@@ -712,9 +709,14 @@ class EvaluacionResponderView(View):
         try:
             with transaction.atomic():
                 evaluacion = get_object_or_404(
-                    Evaluacion.objects.select_for_update().select_related("cuestionario"),
+                    Evaluacion.objects.select_for_update().select_related("cuestionario", "estudiante"),
                     pk=pk,
                 )
+                if not user.is_staff and (
+                    not evaluacion.estudiante.activo
+                    or evaluacion.pk not in request.session.get("evaluaciones_publicas", [])
+                ):
+                    return _json_error("No puedes responder esta evaluación desde esta sesión.", status=403)
                 from apps.assessments.services import (
                     guardar_respuesta,
                     guardar_respuesta_personalidad,
