@@ -1,0 +1,37 @@
+{% extends "admin/change_form.html" %}
+
+{% block bodyclass %}{{ block.super }}{% if change %} bru-user-edit{% endif %}{% endblock %}
+
+{% block content_title %}
+  {% if change %}<h1>Editar usuario</h1>{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+
+{% block content_subtitle %}{% if not change %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block object-tools %}{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+{% if change %}
+<section class="bru-user-intro" aria-labelledby="bru-user-intro-title">
+  <span class="bru-user-avatar" aria-hidden="true">{{ original.first_name|first|default:original.get_username|first|upper }}{{ original.last_name|first|upper }}</span>
+  <div class="bru-user-intro-text">
+    <span class="bru-user-kicker">CUENTA Y ACCESO</span>
+    <h2 id="bru-user-intro-title">{{ original.get_full_name|default:original.get_username }}</h2>
+    <p>@{{ original.get_username }}{% if original.email %} · {{ original.email }}{% endif %}</p>
+  </div>
+  <ul class="bru-user-badges" aria-label="Estado de la cuenta">
+    <li class="{% if original.is_active %}is-ok{% else %}is-off{% endif %}">{% if original.is_active %}Activa{% else %}Inactiva{% endif %}</li>
+    {% for rol in original.groups.all %}<li>{{ rol.name }}</li>{% empty %}<li class="is-off">Sin rol</li>{% endfor %}
+    {% if original.date_joined %}<li class="is-muted">Desde {{ original.date_joined|date:"d/m/Y" }}</li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block field_sets %}
+{% for fieldset in adminform %}
+  {% include "admin/includes/fieldset.html" with heading_level=2 prefix="fieldset" id_prefix=0 id_suffix=forloop.counter0 %}
+  {% if "bru-user-roles" in fieldset.classes %}{% include "admin/auth/user/plantilla_preview.html" %}{% endif %}
+{% endfor %}
+{% endblock %}
