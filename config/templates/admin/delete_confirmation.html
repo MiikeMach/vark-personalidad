@@ -1,0 +1,79 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+{{ media }}
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation bru-form-page{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Inicio</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'change' object.pk|admin_urlquote %}">{{ object|truncatewords:"12" }}</a>
+&rsaquo; Eliminar
+</div>
+{% endblock %}
+
+{% block content_title %}<h1>Eliminar {{ object_name }}</h1>{% endblock %}
+
+{% block content %}
+<div class="bru-delete">
+  {% block delete_card %}
+  <section class="bru-user-intro bru-delete-card" aria-labelledby="bru-delete-name">
+    <span class="bru-user-avatar is-danger" aria-hidden="true">{{ object_name|first|upper }}</span>
+    <div class="bru-user-intro-text">
+      <span class="bru-user-kicker is-danger">{{ object_name|upper }} A ELIMINAR</span>
+      <h2 id="bru-delete-name">{{ object }}</h2>
+    </div>
+  </section>
+  {% endblock %}
+
+  {% if perms_lacking or protected %}
+  <section class="bru-delete-panel is-blocked" role="alert">
+    <strong>No se puede eliminar este registro</strong>
+    {% if perms_lacking %}
+    <p>Al eliminarlo también se borrarían estos registros, y tu cuenta no tiene permiso para eliminarlos:</p>
+    <ul>{{ perms_lacking|unordered_list }}</ul>
+    {% else %}
+    <p>Está en uso por estos registros. Elimínalos o cámbialos primero:</p>
+    <ul>{{ protected|unordered_list }}</ul>
+    {% endif %}
+    <div class="bru-delete-actions">
+      <a class="button bru-delete-cancel" href="{% url opts|admin_urlname:'change' object.pk|admin_urlquote %}">Volver</a>
+    </div>
+  </section>
+  {% else %}
+  <section class="bru-delete-panel" aria-labelledby="bru-delete-question">
+    <strong id="bru-delete-question">¿Seguro que quieres eliminar este registro?</strong>
+    {% block delete_effects %}
+    <ul class="bru-delete-effects">
+      {% for model_name, object_count in model_count %}
+        {% if object_count > 1 or model_name != opts.verbose_name_plural %}
+        <li>También se eliminará{{ object_count|pluralize:"n" }} <b>{{ object_count }} {{ model_name|lower }}</b>.</li>
+        {% endif %}
+      {% endfor %}
+      <li>Esta acción <b>no se puede deshacer</b>.</li>
+    </ul>
+    {% if deleted_objects.1 %}
+    <details class="bru-delete-detail">
+      <summary>Ver todos los registros afectados</summary>
+      <ul>{{ deleted_objects|unordered_list }}</ul>
+    </details>
+    {% endif %}
+    {% endblock %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="post" value="yes">
+      {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+      {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+      <div class="bru-delete-actions">
+        <a class="button bru-delete-cancel" href="{% url opts|admin_urlname:'changelist' %}">Cancelar</a>
+        <button type="submit" class="bru-delete-confirm">Sí, eliminar</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock content %}

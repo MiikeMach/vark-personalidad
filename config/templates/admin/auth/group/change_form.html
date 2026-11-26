@@ -1,0 +1,37 @@
+{% extends "admin/change_form.html" %}
+
+{% block content_title %}
+<h1>{% if add %}Agregar rol{% else %}Editar rol: {{ original }}{% endif %}</h1>
+{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+<aside class="bru-access-help">
+  <strong>Gestiona el acceso en tres pasos</strong>
+  <p>Elige una plantilla, revisa sus permisos y, si tienes autorización, asigna el rol a un usuario. Los cambios se guardan al final.</p>
+  <p>Un rol de acceso no es un grupo escolar. Una cuenta también puede tener otros roles o permisos directos.</p>
+</aside>
+{% if has_change_permission or has_add_permission %}
+<section class="bru-role-presets" aria-labelledby="bru-role-presets-title" data-add="{% if add %}true{% else %}false{% endif %}" hidden>
+  <div>
+    <strong id="bru-role-presets-title">1. Elige una plantilla</strong>
+    <p>{% if add %}La plantilla define el nombre y los permisos del nuevo rol.{% else %}Conserva los permisos actuales o elige una plantilla para reemplazarlos.{% endif %}</p>
+  </div>
+  <div class="bru-role-preset-controls">
+    <label for="bru-role-preset">Plantilla de rol</label>
+    <select id="bru-role-preset" aria-describedby="bru-role-preset-status">
+      <option value="">{% if add %}Selecciona un rol{% else %}Conservar permisos actuales{% endif %}</option>
+      {% for plantilla in plantillas_rol %}<option value="{{ plantilla.key }}">{{ plantilla.name }} · {{ plantilla.description }}</option>{% endfor %}
+    </select>
+    {{ plantillas_rol|json_script:"bru-role-templates-data" }}
+  </div>
+  <p id="bru-role-preset-status" role="status">Los cambios se aplican solo al pulsar Guardar.</p>
+  <div class="bru-role-review" aria-labelledby="bru-role-review-title">
+    <strong id="bru-role-review-title">2. Revisa los permisos del rol</strong>
+    <p id="bru-role-review-status" aria-live="polite"></p>
+    <ul id="bru-role-permission-list"></ul>
+  </div>
+  <p>El rol Administrador no activa por sí solo el acceso al panel ni convierte a una cuenta en superusuario. Estudiante no configura el acceso al sitio público.</p>
+</section>
+{% endif %}
+{% endblock %}

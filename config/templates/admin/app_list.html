@@ -1,0 +1,36 @@
+{% load i18n %}
+{% if app_list %}
+  {% for app in app_list %}
+    <div class="app-{{ app.app_label }} module{% if app.app_url in request.path|urlencode %} current-app{% endif %}">
+      <table>
+        <caption>
+          <a href="{{ app.app_url }}" class="section">
+            {% if app.app_label == "auth" %}Usuarios y acceso{% else %}{{ app.name }}{% endif %}
+          </a>
+          {% if show_changelinks %}
+          <span class="bru-app-description">
+            {% if app.app_label == "auth" %}Gestiona usuarios, roles y permisos de acceso.
+            {% elif app.app_label == "students" %}Organiza estudiantes y grupos escolares.
+            {% elif app.app_label == "questionnaires" %}Administra instrumentos, preguntas y opciones.
+            {% elif app.app_label == "assessments" %}Consulta evaluaciones y respuestas registradas.
+            {% elif app.app_label == "results" %}Consulta resultados y sus puntajes.
+            {% else %}Consulta y administra esta sección.{% endif %}
+          </span>
+          {% endif %}
+        </caption>
+        <thead class="visually-hidden">
+          <tr><th scope="col">Sección</th><th scope="col">Agregar</th>{% if show_changelinks %}<th scope="col">Consultar</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+        {% if app.app_label == "auth" %}
+          {% include "admin/brujuela_app_rows.html" with models=app.models|dictsortreversed:"object_name" %}
+        {% else %}
+          {% include "admin/brujuela_app_rows.html" with models=app.models %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+{% else %}
+  <p>No tienes permisos para consultar o editar información en este panel.</p>
+{% endif %}

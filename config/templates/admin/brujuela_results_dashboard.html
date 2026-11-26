@@ -1,0 +1,58 @@
+<section class="bru-results-dashboard" aria-labelledby="bru-results-title">
+  <div class="bru-results-heading">
+    <div>
+      <span class="bru-eyebrow">VISTA GENERAL</span>
+      <h2 id="bru-results-title">Tablero de resultados</h2>
+      <p>Consulta los resultados registrados y las tendencias generales.</p>
+    </div>
+    <button type="button" id="refreshResults">Actualizar</button>
+  </div>
+  <div id="resultsNotice" class="bru-results-notice" role="status" aria-live="polite" hidden></div>
+  <div class="bru-results-toolbar">
+    <label>Grupo
+      <select id="groupFilter"><option value="">Todos los grupos</option></select>
+    </label>
+    <label>Alumno
+      <select id="studentFilter"><option value="">Todos los alumnos</option></select>
+    </label>
+    <button type="button" id="reportButton" class="bru-results-report">PDF del alcance</button>
+  </div>
+  <p class="bru-results-scope">Alcance: <strong id="scopeLabel">Total</strong></p>
+  <div class="bru-results-stats">
+    <article><span>Evaluaciones</span><strong id="statEvaluations">—</strong><small>registradas en el sistema</small></article>
+    <article><span>Estudiantes</span><strong id="statStudents">—</strong><small>perfiles activos</small></article>
+    <article><span>Resultados</span><strong id="statResults">—</strong><small>instrumentos completados</small></article>
+  </div>
+  <div class="bru-results-grid">
+    <article class="bru-results-card">
+      <h3>Preferencias VARK</h3>
+      <div id="varkChart" class="bru-results-chart" role="img" aria-label="Gráfico de resultados VARK">Cargando resultados…</div>
+    </article>
+    <article class="bru-results-card">
+      <h3>Últimas evaluaciones</h3>
+      <div id="recentResults">Cargando resultados…</div>
+    </article>
+  </div>
+  <article class="bru-results-card">
+    <h3>Preferencias de personalidad</h3>
+    <p>Puntos acumulados en cada dimensión; cada par muestra los dos polos de un mismo eje.</p>
+    <div id="personalityChart" class="bru-results-chart bru-results-chart-wide" role="img" aria-label="Gráfico de resultados de personalidad">Cargando resultados…</div>
+  </article>
+  <article class="bru-results-card">
+    <h3>Resultados encontrados</h3>
+    <p>Busca por nombre, matrícula o grupo, o muestra todos los del alcance elegido.</p>
+    <div class="bru-results-toolbar bru-results-search">
+      <label>Buscar
+        <input id="resultSearch" type="search" placeholder="Nombre, matrícula o grupo">
+      </label>
+      <button type="button" id="searchButton">Buscar</button>
+      <button type="button" id="showAllResults" class="is-secondary">Ver todos</button>
+    </div>
+    <div class="bru-results-table">
+      <table>
+        <thead><tr><th>Estudiante</th><th>Matrícula</th><th>Instrumento</th><th>Estado</th><th>Resultado</th><th>Ficha</th></tr></thead>
+        <tbody id="searchResults"><tr><td colspan="6">Escribe una búsqueda para consultar resultados.</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+</section>

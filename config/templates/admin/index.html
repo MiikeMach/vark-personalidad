@@ -1,0 +1,68 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log static %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+<div class="bru-dashboard">
+  <section class="bru-dashboard-intro">
+    <div>
+      <span class="bru-eyebrow">ESPACIO DE GESTIÓN</span>
+      <h2>Todo en un solo lugar</h2>
+      <p>Administra estudiantes, cuestionarios y resultados. Elige una sección para consultar o agregar información.</p>
+    </div>
+    <a class="bru-intro-link" href="{% url 'home' %}">Ver sitio público <span aria-hidden="true">→</span></a>
+  </section>
+
+  {% if perms.results.view_resultado or perms.results.change_resultado %}
+    {% include "admin/brujuela_results_dashboard.html" %}
+    <script src="{% static 'dashboard/vendor/jspdf.umd.min.js' %}?v=2.5.1" defer></script>
+    <script src="{% static 'dashboard/ficha.js' %}?v=4" defer></script>
+    <script src="{% static 'admin/js/brujuela-results.js' %}?v=7" defer></script>
+  {% endif %}
+
+  <div class="bru-dashboard-layout">
+    <section class="bru-sections" aria-labelledby="bru-sections-title">
+      <div class="bru-section-heading">
+        <div>
+          <span class="bru-eyebrow">PANEL DE GESTIÓN</span>
+          <h2 id="bru-sections-title">Secciones</h2>
+        </div>
+        <p>Selecciona una opción para continuar</p>
+      </div>
+      <div class="bru-app-grid">
+        {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+      </div>
+    </section>
+
+    <aside class="bru-activity" aria-labelledby="bru-activity-title">
+      <span class="bru-eyebrow">TU ACTIVIDAD</span>
+      <h2 id="bru-activity-title">Acciones recientes</h2>
+      <p>Cambios realizados desde tu cuenta.</p>
+      {% get_admin_log 10 as admin_log for_user user %}
+      {% if admin_log %}
+      <ul class="bru-activity-list">
+        {% for entry in admin_log %}
+        <li>
+          <span class="bru-activity-dot" aria-hidden="true"></span>
+          <div>
+            <span class="bru-activity-kind">{% if entry.is_addition %}Agregado{% elif entry.is_change %}Modificado{% else %}Eliminado{% endif %}</span>
+            {% if entry.is_deletion or not entry.get_admin_url %}
+              <span>{{ entry.object_repr }}</span>
+            {% else %}
+              <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+            {% endif %}
+            {% if entry.content_type %}<small>{{ entry.content_type.name|capfirst }}</small>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="bru-activity-empty">Aún no hay actividad reciente.</p>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

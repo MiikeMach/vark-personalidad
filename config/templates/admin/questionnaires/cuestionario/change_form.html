@@ -1,0 +1,89 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block content %}
+{% if add and not is_popup %}
+<section id="bru-questionnaire-builder" class="bru-builder" data-has-errors="{% if errors %}true{% else %}false{% endif %}" hidden>
+  <div class="bru-builder-card">
+    <div class="bru-builder-heading">
+      <div><span class="bru-builder-step">01 · DATOS GENERALES</span><h2>Tu cuestionario</h2></div>
+      <button type="button" class="bru-builder-secondary" data-builder-action="example">Cargar ejemplo ficticio</button>
+    </div>
+    <div class="bru-builder-grid">
+      <label>Título <input type="text" data-builder-field="title" maxlength="150" placeholder="Ej. Preferencias de aprendizaje"></label>
+      <label>Tipo
+        <select data-builder-field="type">
+          <option value="VARK">VARK</option>
+          <option value="PERSONALIDAD">Personalidad</option>
+        </select>
+      </label>
+    </div>
+    <div class="bru-builder-details">
+      <label>Descripción <textarea data-builder-field="description" rows="2"></textarea></label>
+      <label>Instrucciones <textarea data-builder-field="instructions" rows="2"></textarea></label>
+    </div>
+  </div>
+
+  <div class="bru-builder-heading bru-builder-questions-heading">
+    <div><span class="bru-builder-step">02 · PREGUNTAS Y OPCIONES</span><h2>Construye el contenido</h2><p data-builder-type-hint>Agrega al menos dos opciones por pregunta.</p></div>
+  </div>
+  <div class="bru-builder-question-list" data-builder-questions></div>
+  <button type="button" class="bru-builder-secondary bru-add-question-bottom" data-builder-action="add-question" aria-label="Agregar pregunta al final">+ Agregar pregunta</button>
+  <div class="bru-builder-actions">
+    <span class="bru-builder-summary" data-builder-summary aria-live="polite"></span>
+    <button type="button" class="bru-builder-primary" data-builder-action="preview">Ver vista previa</button>
+    <p role="status" aria-live="polite" data-builder-status></p>
+  </div>
+  <section class="bru-builder-card bru-builder-preview" data-builder-preview aria-labelledby="bru-preview-title" hidden>
+    <span class="bru-builder-step">03 · VISTA PREVIA</span>
+    <h2 id="bru-preview-title">Así se verá tu cuestionario</h2>
+    <div data-builder-preview-content></div>
+  </section>
+</section>
+<div id="bru-questionnaire-legacy">
+  {{ block.super }}
+</div>
+<script src="{% static 'admin/js/brujuela-ejemplos.js' %}?v=1" defer></script>
+<script src="{% static 'admin/js/brujuela-questionnaire-builder.js' %}?v=7" defer></script>
+
+<template id="bru-question-template">
+  <article class="bru-builder-card bru-builder-question">
+    <h3 class="bru-visually-hidden" data-question-heading></h3>
+    <div class="bru-builder-question-head">
+      <span class="bru-builder-number" data-question-number aria-hidden="true">1</span>
+      <textarea class="bru-builder-question-input" data-question-text rows="1" placeholder="Escribe la pregunta" aria-label="Texto de la pregunta"></textarea>
+    </div>
+    <ol class="bru-builder-options" data-question-options></ol>
+    <button type="button" class="bru-builder-add-option" data-builder-action="add-option">Agregar opción</button>
+    <div class="bru-builder-question-foot">
+      <span class="bru-builder-count" data-question-count></span>
+      <span class="bru-builder-hint" data-options-hint></span>
+      <button type="button" class="bru-builder-remove" data-builder-action="remove-question">Eliminar pregunta</button>
+    </div>
+  </article>
+</template>
+<template id="bru-option-template">
+  <li class="bru-builder-option" data-dimension="">
+    <span class="bru-builder-choice" aria-hidden="true"></span>
+    <input type="text" data-option-text placeholder="Opción" aria-label="Texto de la opción">
+    <select data-option-dimension aria-label="Dimensión que suma la opción">
+      <option value="">Dimensión…</option>
+      <optgroup label="VARK" data-type="VARK">
+        <option value="V">Visual</option><option value="A">Auditivo</option>
+        <option value="R">Lectura/Escritura</option><option value="K">Kinestésico</option>
+      </optgroup>
+      <optgroup label="Personalidad" data-type="PERSONALIDAD">
+        <option value="E">Extroversión</option><option value="I">Introversión</option>
+        <option value="S">Sensación</option><option value="N">Intuición</option>
+        <option value="T">Pensamiento</option><option value="F">Sentimiento</option>
+        <option value="J">Juicio</option><option value="P">Percepción</option>
+      </optgroup>
+    </select>
+    <button type="button" class="bru-builder-remove-option" data-builder-action="remove-option" title="Eliminar opción"><span aria-hidden="true">×</span></button>
+  </li>
+</template>
+{% else %}
+{{ block.super }}
+{% if change and not is_popup %}<script src="{% static 'admin/js/brujuela-preguntas.js' %}?v=1" defer></script>{% endif %}
+{% endif %}
+{% endblock %}

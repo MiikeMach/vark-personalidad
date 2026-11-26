@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% if title %}{{ title }} · {% endif %}Brújula{% endblock %}
+
+{% block dark-mode-vars %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+{% endblock %}
+
+{% block responsive %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/brujuela-admin.css' %}?v=40">
+{% endblock %}
+
+{% block extrahead %}
+<meta name="theme-color" content="#28775f">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="{% static 'admin/js/brujuela-admin.js' %}?v=21" defer></script>
+{% endblock %}
+
+{% block branding %}
+<div class="bru-brand">
+  <a href="{% url 'admin:index' %}" class="bru-brand-link">
+    <span class="bru-brand-mark">b.</span>
+    <span class="bru-brand-name">brújula<span>.</span><small>ADMINISTRACIÓN</small></span>
+  </a>
+</div>
+{% endblock %}
+
+{% block content_title %}
+  {% if cl %}<h1>{{ cl.opts.verbose_name_plural|capfirst }}</h1>
+  {% elif title %}<h1>{{ title }}</h1>{% endif %}
+{% endblock %}
+
+{% block welcome-msg %}
+<span class="bru-welcome">
+  {% translate "Bienvenido," %}
+  <strong>{% firstof user.get_short_name user.get_username %}</strong>
+</span>
+{% endblock %}
+
+{% block userlinks %}
+  {% if site_url %}
+    <a class="bru-header-action" href="{{ site_url }}">{% translate "View site" %}</a>
+  {% endif %}
+  {% if user.is_active and user.is_staff %}
+    {% url 'django-admindocs-docroot' as docsroot %}
+    {% if docsroot %}
+      <a class="bru-header-action" href="{{ docsroot }}">{% translate "Documentation" %}</a>
+    {% endif %}
+  {% endif %}
+  {% if user.has_usable_password %}
+    <a class="bru-header-action" href="{% url 'admin:password_change' %}">{% translate "Change password" %}</a>
+  {% endif %}
+  <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+    {% csrf_token %}
+    <button type="submit">{% translate "Log out" %}</button>
+  </form>
+{% endblock %}
+
+{% block nav-global %}
+<a class="bru-site-link" href="{% url 'home' %}" aria-label="Volver a la pantalla anterior" title="Volver a la pantalla anterior">
+  <span class="bru-back-arrow" aria-hidden="true">←</span>
+  <span class="bru-site-link-label">Regresar</span>
+</a>
+{% endblock %}
