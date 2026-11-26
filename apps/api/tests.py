@@ -25,7 +25,7 @@ from apps.students.models import Grupo, Estudiante
 
 
 # =====================================================================
-# Flujo existente (se mantiene intacto, incluido el test de /calcular/)
+# Flujo existente (se mantiene intacto)
 # =====================================================================
 
 class FlujoEvaluacionAPITests(TestCase):
@@ -304,6 +304,30 @@ class AuthAPITests(TestCase):
         respuesta = self.client.get("/api/auth/me/")
         self.assertEqual(respuesta.status_code, 401)
 
+    def test_login_sin_csrf_falla_con_enforce(self):
+        client = Client(enforce_csrf_checks=True)
+        resp = client.post(
+            "/api/auth/login/",
+            data=json.dumps({"username": "auth_activo", "password": "clave-auth-2026"}),
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_obtener_csrf_y_luego_login_ok(self):
+        client = Client(enforce_csrf_checks=True)
+        
+        resp = client.get("/api/auth/csrf/")
+        self.assertEqual(resp.status_code, 200)
+        csrf_token = client.cookies.get("csrftoken").value
+        
+        resp = client.post(
+            "/api/auth/login/",
+            data=json.dumps({"username": "auth_activo", "password": "clave-auth-2026"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token
+        )
+        self.assertEqual(resp.status_code, 200)
+
 
 # =====================================================================
 # Control de acceso sobre /responder/ y /calcular/
@@ -350,7 +374,6 @@ class RequireStaffTests(TestCase):
     def test_calcular_staff_pasa_y_da_404_si_no_existe(self):
         self.client.force_login(self.staff)
         respuesta = self._post_calcular()
-        # require_staff deja pasar; get_object_or_404 responde 404.
         self.assertEqual(respuesta.status_code, 404)
 
 
@@ -388,7 +411,7 @@ class CuestionarioCompletoAPITests(TestCase):
 
 
 # =====================================================================
-# Agregados
+# Agregados (Actualizado para privacidad)
 # =====================================================================
 
 class AgregadosAPITests(TestCase):
@@ -401,6 +424,8 @@ class AgregadosAPITests(TestCase):
         cls.cuestionario = Cuestionario.objects.create(
             titulo="VARK agregados", tipo=Cuestionario.Tipo.VARK,
         )
+        
+        # Estudiante 1 y su evaluación
         evaluacion = Evaluacion.objects.create(
             estudiante=cls.estudiante, cuestionario=cls.cuestionario,
         )
@@ -413,10 +438,25 @@ class AgregadosAPITests(TestCase):
         from apps.assessments.models import SeleccionRespuesta
         SeleccionRespuesta.objects.create(respuesta=respuesta, opcion=opcion_v)
         SeleccionRespuesta.objects.create(respuesta=respuesta, opcion=opcion_a)
-
         from apps.results.services import guardar_resultado
-        # guardar_resultado exige estado EN_PROGRESO (no valida respuestas aquí).
         guardar_resultado(evaluacion.pk)
+
+        # Estudiante 2 y su evaluación (Añadido para pasar la regla de privacidad)
+        cls.estudiante2 = Estudiante.objects.create(
+            matricula="AGR-002", nombres="Luis", apellidos="Agregados", grupo=cls.grupo,
+        )
+        evaluacion2 = Evaluacion.objects.create(
+            estudiante=cls.estudiante2, cuestionario=cls.cuestionario,
+        )
+        respuesta2 = Respuesta.objects.create(evaluacion=evaluacion2, pregunta=pregunta)
+        SeleccionRespuesta.objects.create(respuesta=respuesta2, opcion=opcion_v)
+        guardar_resultado(evaluacion2.pk)
+
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            username="staff_agr", password="x", is_staff=True
+        )
+        self.client.force_login(self.staff)
 
     def test_total_vark_200_estructura(self):
         respuesta = self.client.get("/api/resultados/agregados/?alcance=total&tipo=VARK")
@@ -432,6 +472,7 @@ class AgregadosAPITests(TestCase):
         self.assertIn("distribucion_dominante", payload)
 
     def test_grupal_vark_200(self):
+        # Al tener 2 estudiantes en el grupo, ahora debe dar 200
         respuesta = self.client.get(
             f"/api/resultados/agregados/?alcance=grupal&grupo={self.grupo.pk}&tipo=VARK"
         )
@@ -439,6 +480,20 @@ class AgregadosAPITests(TestCase):
         payload = respuesta.json()
         self.assertEqual(payload["alcance"], "grupal")
         self.assertGreaterEqual(payload["n_resultados"], 1)
+
+    def test_grupal_privacidad_minimo_dos_estudiantes(self):
+        # Creamos un grupo nuevo con un solo estudiante
+        grupo_p = Grupo.objects.create(clave="PRI", nombre="Privado")
+        estudiante_p = Estudiante.objects.create(
+            matricula="PRI-001", nombres="Solo", apellidos="Uno", grupo=grupo_p,
+        )
+        Evaluacion.objects.create(estudiante=estudiante_p, cuestionario=self.cuestionario)
+        
+        respuesta = self.client.get(
+            f"/api/resultados/agregados/?alcance=grupal&grupo={grupo_p.pk}&tipo=VARK"
+        )
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertIn("suficientes estudiantes", respuesta.json()["detail"])
 
     def test_alcance_invalido_400(self):
         respuesta = self.client.get("/api/resultados/agregados/?alcance=foo&tipo=VARK")
@@ -467,6 +522,12 @@ class BuscarAPITests(TestCase):
         cls.estudiante = Estudiante.objects.create(
             matricula="BQ-001", nombres="Beto", apellidos="Búsqueda", grupo=cls.grupo,
         )
+        cls.staff = get_user_model().objects.create_user(
+            username="staff_bq", password="x", is_staff=True
+        )
+
+    def setUp(self):
+        self.client.force_login(self.staff)
 
     def test_q_valido_200_devuelve_estudiantes_y_grupos(self):
         respuesta = self.client.get("/api/buscar/?q=BQ")
@@ -489,57 +550,90 @@ class BuscarAPITests(TestCase):
 
 
 # =====================================================================
-# PDF (cabecera, Content-Type, Content-Disposition, bytes)
+# PDF
 # =====================================================================
 
 class PdfAPITests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_user(
+            username="staff_pdf", password="x", is_staff=True
+        )
         cls.grupo = Grupo.objects.create(clave="PDF", nombre="Grupo PDF")
         cls.estudiante = Estudiante.objects.create(
             matricula="PDF-001", nombres="Pía", apellidos="PDF", grupo=cls.grupo,
         )
-        cls.cuestionario = Cuestionario.objects.create(
+        
+        # Datos para VARK
+        cls.cuestionario_vark = Cuestionario.objects.create(
             titulo="VARK PDF", tipo=Cuestionario.Tipo.VARK,
         )
-        cls.evaluacion = Evaluacion.objects.create(
-            estudiante=cls.estudiante, cuestionario=cls.cuestionario,
+        cls.evaluacion_vark = Evaluacion.objects.create(
+            estudiante=cls.estudiante, cuestionario=cls.cuestionario_vark,
         )
-        pregunta = Pregunta.objects.create(
-            cuestionario=cls.cuestionario, texto="P1", orden=1,
-        )
-        opcion_v = Opcion.objects.create(pregunta=pregunta, texto="V", dimension="V", orden=1)
-        respuesta = Respuesta.objects.create(evaluacion=cls.evaluacion, pregunta=pregunta)
+        pregunta_v = Pregunta.objects.create(cuestionario=cls.cuestionario_vark, texto="P1", orden=1)
+        opcion_v = Opcion.objects.create(pregunta=pregunta_v, texto="V", dimension="V", orden=1)
+        resp_v = Respuesta.objects.create(evaluacion=cls.evaluacion_vark, pregunta=pregunta_v)
         from apps.assessments.models import SeleccionRespuesta
-        SeleccionRespuesta.objects.create(respuesta=respuesta, opcion=opcion_v)
-
+        SeleccionRespuesta.objects.create(respuesta=resp_v, opcion=opcion_v)
         from apps.results.services import guardar_resultado
-        cls.resultado = guardar_resultado(cls.evaluacion.pk)
+        cls.resultado_vark = guardar_resultado(cls.evaluacion_vark.pk)
+
+        # Datos para Personalidad
+        cls.cuestionario_pers = Cuestionario.objects.create(
+            titulo="Pers PDF", tipo=Cuestionario.Tipo.PERSONALIDAD,
+        )
+        cls.evaluacion_pers = Evaluacion.objects.create(
+            estudiante=cls.estudiante, cuestionario=cls.cuestionario_pers,
+        )
+        pregunta_p = Pregunta.objects.create(cuestionario=cls.cuestionario_pers, texto="P1", orden=1)
+        op_e = Opcion.objects.create(pregunta=pregunta_p, texto="E", dimension="E", orden=1)
+        op_i = Opcion.objects.create(pregunta=pregunta_p, texto="I", dimension="I", orden=2)
+        resp_p = Respuesta.objects.create(evaluacion=cls.evaluacion_pers, pregunta=pregunta_p)
+        SeleccionRespuesta.objects.create(respuesta=resp_p, opcion=op_e, puntos=7)
+        SeleccionRespuesta.objects.create(respuesta=resp_p, opcion=op_i, puntos=3)
+        cls.resultado_pers = guardar_resultado(cls.evaluacion_pers.pk)
+
+    def setUp(self):
+        self.client.force_login(self.staff)
 
     def _es_pdf(self, contenido):
         return contenido[:5] == b"%PDF-"
 
     def test_pdf_individual_200_pdf_bytes(self):
-        respuesta = self.client.get(f"/api/resultados/{self.resultado.pk}/pdf/")
+        respuesta = self.client.get(f"/api/resultados/{self.resultado_vark.pk}/pdf/")
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta["Content-Type"], "application/pdf")
-        disposicion = respuesta["Content-Disposition"]
-        self.assertIn(f"ficha_resultado_{self.resultado.pk}.pdf", disposicion)
-        self.assertGreater(len(respuesta.content), 0)
+        self.assertIn(f"ficha_resultado_{self.resultado_vark.pk}.pdf", respuesta["Content-Disposition"])
         self.assertTrue(self._es_pdf(respuesta.content))
 
-    def test_pdf_multiple_200_pdf_bytes(self):
+    def test_pdf_multiple_total_vark(self):
         respuesta = self.client.get("/api/resultados/pdf/?alcance=total&tipo=VARK")
         self.assertEqual(respuesta.status_code, 200)
-        self.assertEqual(respuesta["Content-Type"], "application/pdf")
-        disposicion = respuesta["Content-Disposition"]
-        self.assertIn("ficha_total_vark.pdf", disposicion)
-        self.assertGreater(len(respuesta.content), 0)
+        self.assertIn("ficha_total_vark.pdf", respuesta["Content-Disposition"])
+        self.assertTrue(self._es_pdf(respuesta.content))
+
+    def test_pdf_multiple_grupal_vark(self):
+        respuesta = self.client.get(f"/api/resultados/pdf/?alcance=grupal&grupo={self.grupo.pk}&tipo=VARK")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(f"ficha_grupal_vark_grupo{self.grupo.pk}.pdf", respuesta["Content-Disposition"])
+        self.assertTrue(self._es_pdf(respuesta.content))
+
+    def test_pdf_multiple_individual_vark(self):
+        respuesta = self.client.get(f"/api/resultados/pdf/?alcance=individual&estudiante={self.estudiante.pk}&tipo=VARK")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("ficha_individual_vark.pdf", respuesta["Content-Disposition"])
+        self.assertTrue(self._es_pdf(respuesta.content))
+
+    def test_pdf_multiple_total_personalidad(self):
+        respuesta = self.client.get("/api/resultados/pdf/?alcance=total&tipo=PERSONALIDAD")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("ficha_total_personalidad.pdf", respuesta["Content-Disposition"])
         self.assertTrue(self._es_pdf(respuesta.content))
 
 
 # =====================================================================
-# Contacto (locmem.EmailBackend solo en esta clase)
+# Contacto
 # =====================================================================
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
@@ -593,3 +687,95 @@ class ContactoAPITests(TestCase):
         self.assertEqual(respuesta.status_code, 500)
         self.assertIn("No se pudo enviar", respuesta.json()["detail"])
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_mensaje_muy_corto_400(self):
+        respuesta = self._post({
+            "nombre": "Test",
+            "correo": "test@example.com",
+            "asunto": "Hola",
+            "mensaje": "Corto",
+        })
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("mensaje", respuesta.json()["detail"])
+        self.assertIn("Mínimo 10 caracteres.", respuesta.json()["detail"]["mensaje"])
+
+    def test_mensaje_muy_largo_400(self):
+        respuesta = self._post({
+            "nombre": "Test",
+            "correo": "test@example.com",
+            "asunto": "Hola",
+            "mensaje": "A" * 5001,
+        })
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("mensaje", respuesta.json()["detail"])
+        self.assertIn("Máximo 5000 caracteres.", respuesta.json()["detail"]["mensaje"])
+
+    def test_nombre_muy_largo_400(self):
+        respuesta = self._post({
+            "nombre": "A" * 101,
+            "correo": "test@example.com",
+            "asunto": "Hola",
+            "mensaje": "Este es un mensaje de prueba válido.",
+        })
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("nombre", respuesta.json()["detail"])
+
+
+# =====================================================================
+# Contratos y manejo de errores
+# =====================================================================
+
+class ManejoErroresAPITests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_user(
+            username="staff_err", password="x", is_staff=True
+        )
+
+    def setUp(self):
+        self.client.force_login(self.staff)
+
+    def test_json_invalido_400(self):
+        resp = self.client.post(
+            "/api/evaluaciones/iniciar/",
+            data="{esto no es json",
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("JSON inválido", resp.json()["detail"])
+
+    def test_json_raiz_lista_400(self):
+        resp = self.client.post(
+            "/api/evaluaciones/iniciar/",
+            data=json.dumps([1, 2, 3]),
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("debe ser un objeto", resp.json()["detail"])
+
+    def test_iniciar_tipos_incorrectos_400(self):
+        resp = self.client.post(
+            "/api/evaluaciones/iniciar/",
+            data=json.dumps({"estudiante": "1", "cuestionario": 2}),
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("numéricos", resp.json()["detail"])
+
+    def test_responder_items_invalidos_400(self):
+        resp = self.client.post(
+            "/api/evaluaciones/1/responder/",
+            data=json.dumps({"respuestas": "no-es-una-lista"}),
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("debe ser una lista", resp.json()["detail"])
+
+    def test_contacto_raiz_lista_400(self):
+        resp = self.client.post(
+            "/api/contacto/",
+            data=json.dumps([{"nombre": "test"}]),
+            content_type="application/json"
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("debe ser un objeto", resp.json()["detail"])
