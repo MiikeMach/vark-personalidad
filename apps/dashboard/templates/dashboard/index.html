@@ -12,7 +12,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="{% static 'dashboard/styles.css' %}?v=8">
+  <link rel="stylesheet" href="{% static 'dashboard/styles.css' %}?v=9">
   <script src="{% static 'dashboard/vendor/jspdf.umd.min.js' %}?v=2.5.1" defer></script>
   <script src="{% static 'dashboard/ficha.js' %}?v=4" defer></script>
   <script src="{% static 'dashboard/app.js' %}?v=10" defer></script>
@@ -233,6 +233,15 @@
             </div>
             <span class="card-count" data-count="VARK">Cargando cuestionarios…</span>
 
+            <figure class="card-illustration">
+              <img src="{% static 'dashboard/img/vark-estilos-640.webp' %}"
+                   srcset="{% static 'dashboard/img/vark-estilos-640.webp' %} 640w,
+                           {% static 'dashboard/img/vark-estilos-1280.webp' %} 1280w"
+                   sizes="(max-width: 800px) 90vw, 460px"
+                   width="640" height="184" loading="lazy" decoding="async"
+                   alt="Cuatro estudiantes aprendiendo de forma distinta: leyendo un mapa, escuchando con audífonos, leyendo un libro y armando piezas con las manos.">
+            </figure>
+
             <h3>Tu forma de aprender</h3>
 
             <p>
@@ -264,6 +273,15 @@
               <span class="card-number">02 / PERSONALIDAD</span>
             </div>
             <span class="card-count" data-count="PERSONALIDAD">Cargando cuestionarios…</span>
+
+            <figure class="card-illustration">
+              <img src="{% static 'dashboard/img/personalidad-rasgos-640.webp' %}"
+                   srcset="{% static 'dashboard/img/personalidad-rasgos-640.webp' %} 640w,
+                           {% static 'dashboard/img/personalidad-rasgos-1280.webp' %} 1280w"
+                   sizes="(max-width: 800px) 90vw, 460px"
+                   width="640" height="246" loading="lazy" decoding="async"
+                   alt="Cuatro personas con actitudes distintas: conversando, observando con una lupa, reflexionando y organizando una lista de tareas.">
+            </figure>
 
             <h3>Tu forma de ser</h3>
 
