@@ -1,0 +1,4 @@
+-r requirements.txt
+# Pruebas funcionales del frontend (apps/dashboard/tests_e2e.py).
+# Usa Microsoft Edge o Google Chrome instalados; no requiere "playwright install".
+playwright==1.49.1
