@@ -19,28 +19,27 @@ from apps.results.models import Resultado, PuntajeDimension
 from . import serializers as s
 from .auth import require_staff, user_to_dict
 
-
 # ---------- utilidades ----------
 
 def _json_error(message, status=400):
     return JsonResponse({"detail": message}, status=status)
 
-
 def _payload(request):
     if not request.body:
         return {}
     try:
-        return json.loads(request.body.decode("utf-8") or "{}")
+        data = json.loads(request.body.decode("utf-8") or "{}")
+        if not isinstance(data, dict):
+            raise ValidationError("El cuerpo JSON debe ser un objeto.")
+        return data
     except json.JSONDecodeError:
         raise ValidationError("JSON inválido.")
-
 
 def _bool_param(request, name):
     raw = request.GET.get(name)
     if raw is None:
         return None
     return raw.strip().lower() in ("1", "true", "yes", "y", "t")
-
 
 def _int_param(request, name):
     raw = request.GET.get(name)
@@ -51,22 +50,18 @@ def _int_param(request, name):
     except (TypeError, ValueError):
         return None
 
-
 def _str_param(request, name):
     raw = request.GET.get(name)
     if raw is None or raw.strip() == "":
         return None
     return raw.strip()
 
-
 # =====================================================================
 # Auth (login/logout/me)
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class LoginView(View):
     """POST /api/auth/login/  {"username": "...", "password": "..."}"""
-
     def post(self, request, *args, **kwargs):
         try:
             body = _payload(request)
@@ -84,31 +79,23 @@ class LoginView(View):
         login(request, user)
         return JsonResponse({"user": user_to_dict(user)})
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class LogoutView(View):
     """POST /api/auth/logout/"""
-
     def post(self, request, *args, **kwargs):
         logout(request)
         return JsonResponse({"detail": "Sesión cerrada."})
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class MeView(View):
     """GET /api/auth/me/"""
-
     def get(self, request, *args, **kwargs):
         if not request.user or not request.user.is_authenticated:
             return JsonResponse({"user": None}, status=401)
         return JsonResponse({"user": user_to_dict(request.user)})
 
-
 # =====================================================================
 # Base genérica
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class BaseListView(View):
     """
     GET  -> lista (público, con filtros)
@@ -118,7 +105,6 @@ class BaseListView(View):
     to_dict = None
     fields = ()
     ordering = None
-
     def get_queryset(self, request):
         qs = self.model.objects.all()
         if self.ordering:
@@ -130,8 +116,6 @@ class BaseListView(View):
 
     def get(self, request, *args, **kwargs):
         qs = self.get_queryset(request)
-        data = [self.to_dict(o) for o in qs]
-        return JsonResponse(data, safe=False)
         data = [self.to_dict(o) for o in qs]
         return JsonResponse(data, safe=False)
 
@@ -152,8 +136,6 @@ class BaseListView(View):
             return _json_error(str(e), status=409)
         return JsonResponse(self.to_dict(obj), status=201)
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class BaseDetailView(View):
     """
     GET    -> detalle (público)
@@ -232,19 +214,19 @@ class GrupoListView(BaseListView):
             qs = qs.filter(Q(clave__icontains=q) | Q(nombre__icontains=q))
         return qs
 
-
 class GrupoDetailView(BaseDetailView):
     model = Grupo
     to_dict = staticmethod(s.grupo_to_dict)
     fields = ("clave", "nombre", "activo")
 
-
 class EstudianteListView(BaseListView):
     model = Estudiante
     to_dict = staticmethod(s.estudiante_to_dict)
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
-
     ordering = ("apellidos", "nombres")
+    @require_staff
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -264,12 +246,14 @@ class EstudianteListView(BaseListView):
             )
         return qs
 
-
 class EstudianteDetailView(BaseDetailView):
     model = Estudiante
     to_dict = staticmethod(s.estudiante_to_dict)
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
 
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 # =====================================================================
 # questionnaires
@@ -294,12 +278,10 @@ class CuestionarioListView(BaseListView):
             qs = qs.filter(Q(titulo__icontains=q) | Q(descripcion__icontains=q))
         return qs
 
-
 class CuestionarioDetailView(BaseDetailView):
     model = Cuestionario
     to_dict = staticmethod(s.cuestionario_to_dict)
     fields = ("titulo", "descripcion", "instrucciones", "tipo", "activo")
-
 
 class PreguntaListView(BaseListView):
     model = Pregunta
@@ -314,12 +296,10 @@ class PreguntaListView(BaseListView):
             qs = qs.filter(cuestionario_id=cuestionario)
         return qs
 
-
 class PreguntaDetailView(BaseDetailView):
     model = Pregunta
     to_dict = staticmethod(s.pregunta_to_dict)
     fields = ("cuestionario", "texto", "orden")
-
 
 class OpcionListView(BaseListView):
     model = Opcion
@@ -337,12 +317,10 @@ class OpcionListView(BaseListView):
             qs = qs.filter(dimension__iexact=dimension)
         return qs
 
-
 class OpcionDetailView(BaseDetailView):
     model = Opcion
     to_dict = staticmethod(s.opcion_to_dict)
     fields = ("pregunta", "texto", "dimension", "orden")
-
 
 # =====================================================================
 # assessments
@@ -353,6 +331,10 @@ class EvaluacionListView(BaseListView):
     to_dict = staticmethod(s.evaluacion_to_dict)
     fields = ("estudiante", "cuestionario", "estado")
     ordering = "-iniciada_en"
+
+    @require_staff
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -379,12 +361,19 @@ class EvaluacionDetailView(BaseDetailView):
     to_dict = staticmethod(s.evaluacion_to_dict)
     fields = ("estudiante", "cuestionario", "estado", "finalizada_en")
 
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 class RespuestaListView(BaseListView):
     model = Respuesta
     to_dict = staticmethod(s.respuesta_to_dict)
     fields = ("evaluacion", "pregunta")
     ordering = "id"
+
+    @require_staff
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -396,18 +385,24 @@ class RespuestaListView(BaseListView):
             qs = qs.filter(pregunta_id=pregunta)
         return qs
 
-
 class RespuestaDetailView(BaseDetailView):
     model = Respuesta
     to_dict = staticmethod(s.respuesta_to_dict)
     fields = ("evaluacion", "pregunta")
 
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 class SeleccionListView(BaseListView):
     model = SeleccionRespuesta
     to_dict = staticmethod(s.seleccion_to_dict)
     fields = ("respuesta", "opcion")
     ordering = "id"
+
+    @require_staff
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -419,16 +414,17 @@ class SeleccionListView(BaseListView):
             qs = qs.filter(opcion_id=opcion)
         return qs
 
-
 class SeleccionDetailView(BaseDetailView):
     model = SeleccionRespuesta
     to_dict = staticmethod(s.seleccion_to_dict)
     fields = ("respuesta", "opcion")
 
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 def filtrar_resultados(request):
     """Filtros compartidos por ResultadoListView y el endpoint PDF (#8, #14).
-
     Devuelve (qs, error_response). error_response es None si todo OK.
     """
     qs = (
@@ -481,6 +477,7 @@ def filtrar_resultados(request):
         return qs.none(), None
 
     return qs, None
+
 # =====================================================================
 # results
 # =====================================================================
@@ -496,7 +493,7 @@ class ResultadoListView(BaseListView):
     )
     ordering = "-calculado_en"
 
-
+    @require_staff
     def get(self, request, *args, **kwargs):
         alcance = _str_param(request, "alcance")
         if alcance is not None and alcance not in ("individual", "grupal", "total"):
@@ -511,7 +508,6 @@ class ResultadoListView(BaseListView):
             return Resultado.objects.none()
         return qs
 
-
 class ResultadoDetailView(BaseDetailView):
     model = Resultado
     to_dict = staticmethod(s.resultado_to_dict)
@@ -521,12 +517,19 @@ class ResultadoDetailView(BaseDetailView):
         "interpretacion",
     )
 
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 class PuntajeListView(BaseListView):
     model = PuntajeDimension
     to_dict = staticmethod(s.puntaje_to_dict)
     fields = ("resultado", "dimension", "puntaje")
     ordering = "dimension"
+
+    @require_staff
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -538,11 +541,14 @@ class PuntajeListView(BaseListView):
             qs = qs.filter(dimension__iexact=dimension)
         return qs
 
-
 class PuntajeDetailView(BaseDetailView):
     model = PuntajeDimension
     to_dict = staticmethod(s.puntaje_to_dict)
     fields = ("dimension", "puntaje")
+
+    @require_staff
+    def get(self, request, pk, *args, **kwargs):
+        return super().get(request, pk, *args, **kwargs)
 
 # =====================================================================
 # acciones: cálculo de resultados
@@ -550,8 +556,6 @@ class PuntajeDetailView(BaseDetailView):
 
 from apps.scoring.service import ScoringService
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class EvaluacionCalcularView(View):
     """
     POST /api/evaluaciones/{id}/calcular/
@@ -559,7 +563,6 @@ class EvaluacionCalcularView(View):
     Calcula y finaliza la evaluación. La interpretación se genera
     automáticamente según el tipo de cuestionario; no se acepta texto manual.
     """
-
     @require_staff
     def post(self, request, pk, *args, **kwargs):
         evaluacion = get_object_or_404(Evaluacion, pk=pk)
@@ -600,22 +603,15 @@ class CuestionarioCompletoView(View):
         )
         return JsonResponse(s.cuestionario_completo_to_dict(cuestionario))
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class EvaluacionIniciarView(View):
     """
     POST /api/evaluaciones/iniciar/
     Body: {"estudiante": <id>, "cuestionario": <id>}
-    Requiere autenticación (cualquier usuario activo en esta fase).
+    Requiere permisos de staff.
     """
 
+    @require_staff
     def post(self, request, *args, **kwargs):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return JsonResponse(
-                {"detail": "Autenticación requerida."}, status=401
-            )
-
         try:
             body = _payload(request)
         except ValidationError as e:
@@ -625,6 +621,10 @@ class EvaluacionIniciarView(View):
         cuestionario_id = body.get("cuestionario")
         if estudiante_id is None or cuestionario_id is None:
             return _json_error("estudiante y cuestionario son obligatorios.")
+
+        # NUEVO: Validar que sean enteros para evitar 500 en la BD
+        if type(estudiante_id) is not int or type(cuestionario_id) is not int:
+            return _json_error("estudiante y cuestionario deben ser identificadores numéricos.")
 
         estudiante = Estudiante.objects.filter(pk=estudiante_id).first()
         if estudiante is None:
@@ -681,7 +681,6 @@ class EvaluacionIniciarView(View):
 # acciones: envío bulk de respuestas
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class EvaluacionResponderView(View):
     """POST /api/evaluaciones/{id}/responder/.
 
@@ -790,7 +789,6 @@ class EvaluacionResponderView(View):
 
 from apps.api.aggregations import agregar_resultados
 
-
 def _validar_alcance_tipo(request):
     alcance = _str_param(request, "alcance")
     tipo = _str_param(request, "tipo")
@@ -843,8 +841,6 @@ def _resultados_filtrados(request, alcance, tipo):
 
     return qs, None
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class ResultadoAgregadosView(View):
     """GET /api/resultados/agregados/?alcance=…&tipo=…[&estudiante|grupo|cuestionario]"""
 
@@ -857,8 +853,6 @@ class ResultadoAgregadosView(View):
             return error
         return JsonResponse(agregar_resultados(qs, alcance, tipo))
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class DashboardGrupalView(View):
     """GET /api/dashboard/grupal/?grupo=…&tipo=… (alias de agregados/grupal)"""
 
@@ -876,16 +870,16 @@ class DashboardGrupalView(View):
 # #8: búsqueda de alumnos y grupos para autocompletado
 # =====================================================================
 
-@method_decorator(csrf_exempt, name="dispatch")
 class BuscarView(View):
     """GET /api/buscar/?q=...  → estudiantes y grupos que coinciden.
 
-    Público. Requiere q con al menos 2 caracteres.
+    Requiere permisos de staff.
     """
 
     LIMITE = 20
     MIN_LEN = 2
 
+    @require_staff
     def get(self, request, *args, **kwargs):
         q = _str_param(request, "q")
         if not q or len(q) < self.MIN_LEN:
@@ -924,11 +918,10 @@ class BuscarView(View):
 from django.http import HttpResponse
 from apps.api.pdf import construir_pdf_individual, construir_pdf_multiple
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class ResultadoPdfView(View):
     """GET /api/resultados/{pk}/pdf/  → ficha individual."""
 
+    @require_staff
     def get(self, request, pk, *args, **kwargs):
         resultado = get_object_or_404(
             Resultado.objects
@@ -946,8 +939,6 @@ class ResultadoPdfView(View):
         )
         return response
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class ResultadosPdfView(View):
     """GET /api/resultados/pdf/?…  → portada agregada + fichas individuales.
 
@@ -955,6 +946,7 @@ class ResultadosPdfView(View):
     estudiante, tipo, cuestionario).
     """
 
+    @require_staff
     def get(self, request, *args, **kwargs):
         qs, error = filtrar_resultados(request)
         if error is not None:
