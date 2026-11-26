@@ -1,0 +1,12 @@
+{% if roles_preview is not None %}
+{{ roles_preview|json_script:"bru-user-templates-data" }}
+<div class="bru-user-template-preview" id="bru-user-template-preview" role="region" aria-labelledby="bru-user-template-title" hidden>
+  <div class="bru-role-review">
+    <strong id="bru-user-template-title">Permisos que tendrá la cuenta</strong>
+    <p id="bru-user-template-description">Elige un rol para ver sus permisos.</p>
+    <p id="bru-user-template-access"></p>
+    <p id="bru-user-template-status" aria-live="polite"></p>
+    <ul id="bru-user-template-permissions"></ul>
+  </div>
+</div>
+{% endif %}

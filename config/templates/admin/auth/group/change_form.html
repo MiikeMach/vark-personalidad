@@ -21,12 +21,9 @@
     <label for="bru-role-preset">Plantilla de rol</label>
     <select id="bru-role-preset" aria-describedby="bru-role-preset-status">
       <option value="">{% if add %}Selecciona un rol{% else %}Conservar permisos actuales{% endif %}</option>
-      <option value="administrador">Administrador · todos los permisos</option>
-      <option value="coordinador">Coordinador · gestión académica</option>
-      <option value="docente">Docente · consulta y evaluaciones</option>
-      <option value="consultor">Consultor / Psicopedagogo · consulta</option>
-      <option value="estudiante">Estudiante · sin permisos de administración</option>
+      {% for plantilla in plantillas_rol %}<option value="{{ plantilla.key }}">{{ plantilla.name }} · {{ plantilla.description }}</option>{% endfor %}
     </select>
+    {{ plantillas_rol|json_script:"bru-role-templates-data" }}
   </div>
   <p id="bru-role-preset-status" role="status">Los cambios se aplican solo al pulsar Guardar.</p>
   <div class="bru-role-review" aria-labelledby="bru-role-review-title">
