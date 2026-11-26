@@ -30,7 +30,11 @@ from apps.students.models import Estudiante, Grupo
 try:
     from playwright.sync_api import Error as PlaywrightError, expect, sync_playwright
 except ImportError:  # pragma: no cover - depende del entorno
+    # Se definen igualmente para que otros módulos (tests_frontend_e2e) puedan
+    # importarlos sin fallar; las clases quedan omitidas por skipIf.
     sync_playwright = None
+    expect = None
+    PlaywrightError = Exception
 
 TIEMPO = 10_000  # ms
 
