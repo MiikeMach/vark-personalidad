@@ -1,6 +1,9 @@
-3. Modelo físico de la base de datos
-El modelo físico se deriva directamente de las migraciones de Django y del DER exportado desde pgAdmin. Todas las tablas residen en el esquema public de PostgreSQL 18.
-3.1 DER (Mermaid)
+# 3. Modelo físico de la base de datos
+
+El modelo físico se deriva directamente de las migraciones de Django y del DER exportado desde pgAdmin. Todas las tablas residen en el esquema `public` de PostgreSQL 18.
+
+## 3.1. DER (Mermaid)
+
 erDiagram
     students_grupo ||--o{ students_estudiante : contiene
     questionnaires_cuestionario ||--o{ questionnaires_pregunta : tiene
@@ -87,95 +90,116 @@ erDiagram
         bigint resultado_id FK
     }
 
-3.2 Diccionario de tablas
+## 3.2. Diccionario de tablas
+### 3.2.1. students_grupo
 
-3.2.1 students_grupo
-Columna	Tipo	Restricciones
-id	bigint	PK, IDENTITY
-clave	varchar(20)	UNIQUE, NOT NULL
-nombre	varchar(100)	NOT NULL
-activo	boolean	NOT NULL, default true
-creado_en	timestamptz	NOT NULL, auto
+|Columna | Tipo	| Restricciones |
+|---|---|---|
+|id	| bigint | PK, IDENTITY |
+|clave | varchar(20) | UNIQUE, NOT NULL |
+|nombre	| varchar(100) | NOT NULL |
+|activo | boolean | NOT NULL, default true |
+|creado_en | timestamptz | NOT NULL, auto |
 
-3.2.2 students_estudiante
-Columna	Tipo	Restricciones
-id	bigint	PK
-matricula	varchar(30)	UNIQUE, NOT NULL
-nombres	varchar(100)	NOT NULL
-apellidos	varchar(100)	NOT NULL
-correo	varchar(254)	opcional
-activo	boolean	NOT NULL
-creado_en	timestamptz	NOT NULL
-grupo_id	bigint	FK → students_grupo(id), ON DELETE PROTECT
+### 3.2.2. students_estudiante
 
-3.2.3 questionnaires_cuestionario
-Columna	Tipo	Restricciones
-id	bigint	PK
-titulo	varchar(150)	NOT NULL
-descripcion	text	opcional
-instrucciones	text	opcional
-tipo	varchar(20)	CHECK en ('VARK','PERSONALIDAD')
-activo	boolean	NOT NULL
-creado_en	timestamptz	NOT NULL
+|Columna | Tipo	| Restricciones |
+|---|---|---|
+|id	| bigint | PK |
+|matricula | varchar(30) | UNIQUE, NOT NULL |
+|nombres | varchar(100) | NOT NULL |
+|apellidos | varchar(100) | NOT NULL |
+|correo | varchar(254) | opcional |
+|activo | boolean | NOT NULL |
+|creado_en | timestamptz | NOT NULL |
+|grupo_id | bigint | FK → students_grupo(id), ON DELETE PROTECT |
 
-3.2.4 questionnaires_pregunta
-Columna	Tipo	Restricciones
-id	bigint	PK
-texto	text	NOT NULL
-orden	integer	NOT NULL
-cuestionario_id	bigint	FK → questionnaires_cuestionario(id), ON DELETE CASCADE
-—	—	UNIQUE(cuestionario_id, orden)
+### 3.2.3. questionnaires_cuestionario
 
-3.2.5 questionnaires_opcion
-Columna	Tipo	Restricciones
-id	bigint	PK
-texto	text	NOT NULL
-dimension	varchar(1)	CHECK en ('V','A','R','K','E','I','S','N','T','F','J','P')
-orden	integer	NOT NULL
-pregunta_id	bigint	FK → questionnaires_pregunta(id), ON DELETE CASCADE
-—	—	UNIQUE(pregunta_id, orden)
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| titulo | varchar(150) | NOT NULL |
+| descripcion | text | opcional |
+| instrucciones | text | opcional |
+| tipo | varchar(20) | CHECK en ('VARK','PERSONALIDAD') |
+| activo | boolean | NOT NULL |
+| creado_en | timestamptz | NOT NULL |
 
-3.2.6 assessments_evaluacion
-Columna	Tipo	Restricciones
-id	bigint	PK
-estado	varchar(20)	CHECK en ('EN_PROGRESO','FINALIZADA')
-iniciada_en	timestamptz	NOT NULL
-finalizada_en	timestamptz	opcional
-cuestionario_id	bigint	FK → questionnaires_cuestionario(id), PROTECT
-estudiante_id	bigint	FK → students_estudiante(id), PROTECT
+### 3.2.4. questionnaires_pregunta
 
-3.2.7 assessments_respuesta
-Columna	Tipo	Restricciones
-id	bigint	PK
-evaluacion_id	bigint	FK → assessments_evaluacion(id), CASCADE
-pregunta_id	bigint	FK → questionnaires_pregunta(id), PROTECT
-—	—	UNIQUE(evaluacion_id, pregunta_id)
+|Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| texto | text | NOT NULL |
+| orden | integer | NOT NULL |
+| cuestionario_id | bigint | FK → questionnaires_cuestionario(id), ON DELETE CASCADE |
+| — | — | UNIQUE(cuestionario_id, orden) |
 
-3.2.8 assessments_seleccionrespuesta
-Columna	Tipo	Restricciones
-id	bigint	PK
-puntos	smallint	opcional, CHECK >= 0
-opcion_id	bigint	FK → questionnaires_opcion(id), PROTECT
-respuesta_id	bigint	FK → assessments_respuesta(id), CASCADE
-—	—	UNIQUE(respuesta_id, opcion_id)
+## 3.2.5. questionnaires_opcion
 
-3.2.9 results_resultado
-Columna	Tipo	Restricciones
-id	bigint	PK
-preguntas_contestadas	integer	NOT NULL, >= 0
-preguntas_omitidas	integer	NOT NULL, >= 0
-interpretacion	text	opcional
-calculado_en	timestamptz	NOT NULL
-evaluacion_id	bigint	FK UNIQUE → assessments_evaluacion(id), CASCADE
-3.2.10. results_puntajedimension
-Columna	Tipo	Restricciones
-id	bigint	PK
-dimension	varchar(1)	CHECK en las 12 dimensiones
-puntaje	integer	NOT NULL, >= 0
-resultado_id	bigint	FK → results_resultado(id), CASCADE
-—	—	UNIQUE(resultado_id, dimension)
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| texto | text | NOT NULL |
+| dimension | varchar(1) | CHECK en ('V','A','R','K','E','I','S','N','T','F','J','P') |
+| orden| integer | NOT NULL |
+| pregunta_id | bigint | FK → questionnaires_pregunta(id), ON DELETE CASCADE |
+| — | — | UNIQUE(pregunta_id, orden) |
 
-3.3 Restricciones globales
+## 3.2.6. assessments_evaluacion
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| estado | varchar(20) | CHECK en ('EN_PROGRESO','FINALIZADA') |
+| iniciada_en | timestamptz | NOT NULL |
+| finalizada_en | timestamptz | opcional |
+| cuestionario_id | bigint | FK → questionnaires_cuestionario(id), PROTECT |
+| estudiante_id | bigint | FK → students_estudiante(id), PROTECT |
+
+## 3.2.7. assessments_respuesta
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| evaluacion_id | bigint | FK → assessments_evaluacion(id), CASCADE |
+| pregunta_id | bigint | FK → questionnaires_pregunta(id), PROTECT |
+| — | — | UNIQUE(evaluacion_id, pregunta_id) |
+
+## 3.2.8. assessments_seleccionrespuesta
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| puntos | smallint | opcional, CHECK >= 0 |
+| opcion_id | bigint | FK → questionnaires_opcion(id), PROTECT |
+| respuesta_id | bigint | FK → assessments_respuesta(id), CASCADE |
+| — | — | UNIQUE(respuesta_id, opcion_id) |
+
+## 3.2.9. results_resultado
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| id | bigint | PK |
+| preguntas_contestadas | integer | NOT NULL, >= 0 |
+| preguntas_omitidas | integer | NOT NULL, >= 0 |
+| interpretacion | text | opcional |
+| calculado_en | timestamptz | NOT NULL |
+| evaluacion_id | bigint | FK UNIQUE → assessments_evaluacion(id), CASCADE |
+
+## 3.2.10. results_puntajedimension
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+|id | bigint | PK |
+|dimension | varchar(1) | CHECK en las 12 dimensiones |
+|puntaje | integer | NOT NULL, >= 0 |
+|resultado_id | bigint | FK → results_resultado(id), CASCADE |
+| — | — | UNIQUE(resultado_id, dimension) |
+
+## 3.3. Restricciones globales
+
 - PROTECT en estudiante.grupo, evaluacion.estudiante, evaluacion.cuestionario, respuesta.pregunta y seleccion.opcion evita borrados accidentales en cascada.
 - CASCADE en respuesta.evaluacion, seleccion.respuesta, resultado.evaluacion, puntaje.resultado, pregunta.cuestionario y opcion.pregunta.
 - UNIQUE garantiza:
@@ -185,7 +209,8 @@ resultado_id	bigint	FK → results_resultado(id), CASCADE
 -- (resultado, dimension): sin puntajes duplicados.
 -- evaluacion en resultado: un resultado vigente por intento.
 
-3.4 Script SQL equivalente (extracto)
+## 3.4. Script SQL equivalente (extracto)
+
 CREATE TABLE students_grupo (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   clave VARCHAR(20) NOT NULL UNIQUE,
