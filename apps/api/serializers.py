@@ -35,6 +35,17 @@ def estudiante_to_dict(obj):
     }
 
 
+def estudiante_publico_to_dict(obj):
+    """Versión mínima para visitantes sin sesión (sin matrícula ni correo)."""
+    return {
+        "id": obj.id,
+        "nombres": obj.nombres,
+        "apellidos": obj.apellidos,
+        "grupo": obj.grupo_id,
+        "activo": obj.activo,
+    }
+
+
 # ---------- questionnaires ----------
 
 def cuestionario_to_dict(obj):

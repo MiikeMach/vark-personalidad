@@ -68,10 +68,11 @@ def _str_param(request, name):
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CsrfTokenView(View):
-    """Inicializa la cookie CSRF para las solicitudes del frontend."""
-
+    """GET /api/auth/csrf/ -> Fuerza el envío de la cookie csrftoken al cliente."""
     def get(self, request, *args, **kwargs):
         return JsonResponse({"detail": "CSRF cookie set"})
+
+
 class LoginView(View):
     """POST /api/auth/login/  {"username": "...", "password": "..."}"""
 
@@ -247,9 +248,17 @@ class EstudianteListView(BaseListView):
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
     ordering = ("apellidos", "nombres")
 
-    @require_staff
     def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        if request.user.is_staff:
+            return super().get(request, *args, **kwargs)
+        # Visitantes: solo lo necesario para elegir alumno en el sitio público.
+        # Sin matrícula, correo ni búsqueda; únicamente estudiantes activos.
+        qs = Estudiante.objects.filter(activo=True).order_by(*self.ordering)
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            qs = qs.filter(grupo_id=grupo)
+        data = [s.estudiante_publico_to_dict(o) for o in qs]
+        return JsonResponse(data, safe=False)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -625,16 +634,15 @@ class CuestionarioCompletoView(View):
         )
         return JsonResponse(s.cuestionario_completo_to_dict(cuestionario))
 
+
 class EvaluacionIniciarView(View):
     """
     POST /api/evaluaciones/iniciar/
     Body: {"estudiante": <id>, "cuestionario": <id>}
-
-    Inicia una evaluación para un estudiante.
-    Requiere personal autorizado.
+    Cualquier visitante puede seleccionar un estudiante activo. Las
+    evaluaciones de visitantes quedan asociadas a su sesión de navegador.
     """
 
-    @require_staff
     def post(self, request, *args, **kwargs):
         user = request.user
         try:
@@ -661,7 +669,8 @@ class EvaluacionIniciarView(View):
             return _json_error("Cuestionario no encontrado.", status=404)
         if not cuestionario.activo:
             return _json_error("El cuestionario no está activo.")
-            evaluaciones = Evaluacion.objects.filter(
+
+        evaluaciones = Evaluacion.objects.filter(
             estudiante=estudiante,
             cuestionario=cuestionario,
             estado=Evaluacion.Estado.EN_PROGRESO,
@@ -711,13 +720,14 @@ class EvaluacionIniciarView(View):
 # =====================================================================
 
 class EvaluacionResponderView(View):
-    """
-    POST /api/evaluaciones/{id}/responder/
+    """POST /api/evaluaciones/{id}/responder/.
 
-    VARK: recibe una lista de opciones por pregunta.
-    Personalidad: recibe dos opciones con sus respectivos puntos.
+    VARK: {"respuestas": [{"pregunta": 1, "opciones": [2, 3]}], "calcular": true}
+    Personalidad: {"respuestas": [{"pregunta": 1, "selecciones":
+      [{"opcion": 2, "puntos": 7}, {"opcion": 3, "puntos": 3}]}], "calcular": true}
 
-    Requiere personal autorizado.
+    El personal puede responder cualquier evaluación; los visitantes solo
+    pueden responder las que iniciaron en su sesión de navegador.
     """
 
     def post(self, request, pk, *args, **kwargs):
@@ -883,7 +893,7 @@ class ResultadoAgregadosView(View):
         qs, error = _resultados_filtrados(request, alcance, tipo)
         if error is not None:
             return error
-
+            
         # Privacidad: Si es grupal, exigir al menos 2 estudiantes únicos
         if alcance == "grupal":
             estudiantes_unicos = qs.values_list("evaluacion__estudiante_id", flat=True).distinct().count()
@@ -892,7 +902,7 @@ class ResultadoAgregadosView(View):
                     "El grupo no tiene suficientes estudiantes evaluados para generar un reporte anónimo.",
                     status=403
                 )
-
+                
         return JsonResponse(agregar_resultados(qs, alcance, tipo))
 
 
@@ -907,14 +917,14 @@ class DashboardGrupalView(View):
         qs, error = _resultados_filtrados(request, alcance, tipo)
         if error is not None:
             return error
-
+            
         estudiantes_unicos = qs.values_list("evaluacion__estudiante_id", flat=True).distinct().count()
         if estudiantes_unicos < 2:
             return _json_error(
                 "El grupo no tiene suficientes estudiantes evaluados para generar un reporte anónimo.",
                 status=403
             )
-
+            
         return JsonResponse(agregar_resultados(qs, alcance, tipo))
 
 

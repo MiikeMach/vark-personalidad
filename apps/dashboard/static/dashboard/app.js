@@ -1,10 +1,10 @@
-﻿(() => {
+(() => {
   const API = "/api/";
   const state = {
     students: [],
     groups: [],
     questionnaires: [],
-    details: {},          // id de cuestionario ÔåÆ cuestionario completo (con preguntas)
+    details: {},          // id de cuestionario → cuestionario completo (con preguntas)
     questions: [],
     answers: [],
     evaluationId: null,
@@ -12,90 +12,43 @@
     kind: "VARK",
     user: null,
     loaded: false,
-    active: null,         // { student, questionnaire } de la evaluaci├│n en curso
-    lastResult: null,     // datos de la ficha del ├║ltimo resultado
+    active: null,         // { student, questionnaire } de la evaluación en curso
+    lastResult: null,     // datos de la ficha del último resultado
   };
   const labels = {
-    V: "Visual", A: "Auditivo", R: "Lectura/Escritura", K: "Kinest├®sico",
-    E: "Extroversi├│n", I: "Introversi├│n", S: "Sensaci├│n", N: "Intuici├│n",
-    T: "Pensamiento", F: "Sentimiento", J: "Juicio", P: "Percepci├│n",
+    V: "Visual", A: "Auditivo", R: "Lectura/Escritura", K: "Kinestésico",
+    E: "Extroversión", I: "Introversión", S: "Sensación", N: "Intuición",
+    T: "Pensamiento", F: "Sentimiento", J: "Juicio", P: "Percepción",
   };
   const varkColors = { V: "#63a881", A: "#d6a461", R: "#8c7ab8", K: "#d78671" };
   const personalityPairs = ["EI", "SN", "TF", "JP"];
-  const SKIPPED = "omitida"; // Marca de pregunta VARK omitida a prop├│sito.
-  const personalityAxes = [["E", "I", "Energ├¡a"], ["S", "N", "Informaci├│n"], ["T", "F", "Decisiones"], ["J", "P", "Estilo de vida"]];
+  const SKIPPED = "omitida"; // Marca de pregunta VARK omitida a propósito.
+  const personalityAxes = [["E", "I", "Energía"], ["S", "N", "Información"], ["T", "F", "Decisiones"], ["J", "P", "Estilo de vida"]];
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-  function getCookie(name) {
-    const cookies = document.cookie.split(";");
-
-    for (const cookie of cookies) {
-      const [key, ...value] = cookie.trim().split("=");
-
-      if (key === name) {
-        return decodeURIComponent(value.join("="));
-      }
-    }
-
-    return null;
-  }
-
   async function api(path, options = {}) {
-  const method = (options.method || "GET").toUpperCase();
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
-
-  if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
-    let token = getCookie("csrftoken");
-
-    if (!token) {
-      const response = await fetch(`${API}auth/csrf/`, {
-        credentials: "same-origin",
-      });
-
-      if (!response.ok) {
-        throw new Error("No se pudo inicializar la protección CSRF.");
+    const csrf = $('input[name="csrfmiddlewaretoken"]');
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.method && options.method !== "GET" ? { "X-CSRFToken": csrf.value } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    if (!response.ok) {
+      let detail = `La solicitud falló (${response.status}).`;
+      try {
+        const body = await response.json();
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail || body);
+      } catch (_) {
+        // Se conserva el estado HTTP cuando la respuesta no es JSON.
       }
-
-      token = getCookie("csrftoken");
+      throw new Error(detail);
     }
-
-    if (!token) {
-      throw new Error("No se encontró el token CSRF.");
-    }
-
-    headers["X-CSRFToken"] = token;
+    return response.status === 204 ? null : response.json();
   }
-
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    method,
-    credentials: "same-origin",
-    headers,
-  });
-
-  if (!response.ok) {
-    let detail = `La solicitud falló (${response.status}).`;
-
-    try {
-      const body = await response.json();
-      detail =
-        typeof body.detail === "string"
-          ? body.detail
-          : JSON.stringify(body.detail || body);
-    } catch (_) {
-      // Se conserva el estado HTTP si la respuesta no es JSON.
-    }
-
-    throw new Error(detail);
-  }
-
-  return response.status === 204 ? null : response.json();
-}
 
   function showNotice(message, type = "error") {
     const notice = $("#globalNotice");
@@ -114,13 +67,13 @@
     $$(".page-section").forEach((section) => section.classList.toggle("current", section.id === `page-${safeName}`));
     $$(".nav-link[data-route]:not([data-scroll])").forEach((link) => link.classList.toggle("active", link.dataset.route === safeName));
     $("#pageName").textContent = $(`#page-${safeName}`).dataset.title;
-    document.title = `${$("#pageName").textContent[0]}${$("#pageName").textContent.slice(1).toLowerCase()} | Br├║jula`;
+    document.title = `${$("#pageName").textContent[0]}${$("#pageName").textContent.slice(1).toLowerCase()} | Brújula`;
     $("#sidebar").classList.remove("open");
     $("#mobileScrim").classList.remove("visible");
     $("#menuToggle").setAttribute("aria-expanded", "false");
     clearNotice();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // Al entrar a Instrumentos se vuelve a pedir la lista: as├¡ aparecen los cuestionarios reci├®n creados.
+    // Al entrar a Instrumentos se vuelve a pedir la lista: así aparecen los cuestionarios recién creados.
     if (safeName === "instrumentos" && state.loaded) refreshQuestionnaires();
   }
 
@@ -129,7 +82,7 @@
     select.replaceChildren();
     const empty = document.createElement("option");
     empty.value = "";
-    empty.textContent = rows.length ? "Selecciona una opci├│n" : emptyLabel;
+    empty.textContent = rows.length ? "Selecciona una opción" : emptyLabel;
     select.append(empty);
     rows.forEach((row) => {
       const option = document.createElement("option");
@@ -170,8 +123,8 @@
     state.loaded = true;
     updateQuestionnaires();
     updateSessionUI();
-    $("#connectionStatus").textContent = failed.length ? "Conexi├│n parcial" : "Sistema conectado";
-    if (failed.length) showNotice(`No se pudieron cargar algunos datos (${failed.join(", ")}). Recarga la p├ígina o intenta m├ís tarde.`);
+    $("#connectionStatus").textContent = failed.length ? "Conexión parcial" : "Sistema conectado";
+    if (failed.length) showNotice(`No se pudieron cargar algunos datos (${failed.join(", ")}). Recarga la página o intenta más tarde.`);
   }
 
   // Recarga silenciosa de la lista (al entrar a Instrumentos); si falla, se conserva la anterior.
@@ -192,21 +145,21 @@
       ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
       : user?.username;
     $("#userName").textContent = displayName || "Tu espacio";
-    $("#userRole").textContent = user ? (user.is_staff ? "Sesi├│n de administrador" : "Sesi├│n activa") : "Aprendizaje personal";
+    $("#userRole").textContent = user ? (user.is_staff ? "Sesión de administrador" : "Sesión activa") : "Aprendizaje personal";
     $("#userAvatar").textContent = (displayName || "B").charAt(0).toUpperCase();
     $("#logoutButton").hidden = !user;
     updateGroupOptions();
     updateStudentOptions();
   }
 
-  // La evaluaci├│n se puede aplicar a un grupo: se elige el grupo y luego a cada estudiante de ese grupo.
+  // La evaluación se puede aplicar a un grupo: se elige el grupo y luego a cada estudiante de ese grupo.
   function updateGroupOptions() {
     const select = $("#groupSelect");
     const previous = select.value;
     const withStudents = new Set(state.students.filter((student) => student.activo).map((student) => student.grupo));
     const groups = state.groups.filter((group) => group.activo && withStudents.has(group.id));
     select.replaceChildren(new Option("Todos los grupos", ""));
-    groups.forEach((group) => select.add(new Option(`${group.nombre} ┬À ${group.clave}`, group.id)));
+    groups.forEach((group) => select.add(new Option(`${group.nombre} · ${group.clave}`, group.id)));
     select.value = groups.some((group) => String(group.id) === previous) ? previous : "";
   }
 
@@ -214,7 +167,8 @@
     const group = $("#groupSelect").value;
     const students = state.students.filter((student) => student.activo && (!group || String(student.grupo) === group));
     setOptions($("#studentSelect"), students, group ? "No hay estudiantes en este grupo" : "No hay estudiantes disponibles",
-      (student) => `${student.nombres} ${student.apellidos} ┬À ${student.matricula}`);
+      // Los visitantes no reciben la matrícula; el personal sí.
+      (student) => `${student.nombres} ${student.apellidos}${student.matricula ? ` · ${student.matricula}` : ""}`);
     $("#assessmentSetup").querySelector('button[type="submit"]').disabled = !students.length;
   }
 
@@ -236,7 +190,7 @@
   function updateCounts() {
     ["VARK", "PERSONALIDAD"].forEach((kind) => {
       const ready = availableQuestionnaires(kind).filter((q) => questionCount(q) !== 0).length;
-      const text = ready ? `${plural(ready, "cuestionario disponible", "cuestionarios disponibles")}` : "A├║n no hay cuestionarios";
+      const text = ready ? `${plural(ready, "cuestionario disponible", "cuestionarios disponibles")}` : "Aún no hay cuestionarios";
       $$(`[data-count="${kind}"]`).forEach((element) => {
         element.textContent = text;
         element.classList.toggle("is-empty", !ready);
@@ -248,8 +202,8 @@
     const select = $("#questionnaireSelect");
     const active = availableQuestionnaires(state.kind);
     setOptions(select, active, "No hay cuestionarios activos", (questionnaire) =>
-      questionCount(questionnaire) === 0 ? `${questionnaire.titulo} ┬À sin preguntas` : questionnaire.titulo);
-    // Un cuestionario sin preguntas todav├¡a no se puede contestar.
+      questionCount(questionnaire) === 0 ? `${questionnaire.titulo} · sin preguntas` : questionnaire.titulo);
+    // Un cuestionario sin preguntas todavía no se puede contestar.
     [...select.options].forEach((option) => {
       const questionnaire = active.find((item) => String(item.id) === option.value);
       option.disabled = Boolean(questionnaire) && questionCount(questionnaire) === 0;
@@ -258,9 +212,9 @@
     // Si solo hay uno disponible, se deja elegido.
     const enabled = [...select.options].filter((option) => option.value && !option.disabled);
     if (!select.value && enabled.length === 1) select.value = enabled[0].value;
-    $("#assessmentTitle").textContent = state.kind === "VARK" ? "Estilo de aprendizaje VARK" : "Personalidad ┬À Jung / Myers-Briggs";
+    $("#assessmentTitle").textContent = state.kind === "VARK" ? "Estilo de aprendizaje VARK" : "Personalidad · Jung / Myers-Briggs";
     $("#assessmentDescription").textContent = state.kind === "VARK"
-      ? "Cu├®ntanos qui├®n eres para asociar tus respuestas a tu perfil."
+      ? "Cuéntanos quién eres para asociar tus respuestas a tu perfil."
       : "Reflexiona sobre tus preferencias personales. No existen respuestas correctas o incorrectas.";
     updateCounts();
     updatePreview();
@@ -275,7 +229,7 @@
     const count = questionCount(questionnaire);
     $("#previewTitle").textContent = questionnaire.titulo;
     $("#previewCount").textContent = count === null ? questionnaire.tipo : plural(count, "pregunta", "preguntas");
-    $("#previewDescription").textContent = questionnaire.descripcion || "Sin descripci├│n.";
+    $("#previewDescription").textContent = questionnaire.descripcion || "Sin descripción.";
     $("#previewInstructions").textContent = questionnaire.instrucciones || "";
     $("#previewInstructions").hidden = !questionnaire.instrucciones;
   }
@@ -303,7 +257,7 @@
     updateQuestionnaires();
   }
 
-  // ---------------------------------------------------------------- evaluaci├│n
+  // ---------------------------------------------------------------- evaluación
 
   async function beginAssessment(event) {
     event.preventDefault();
@@ -318,15 +272,15 @@
     }
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
-    submit.textContent = "Preparando evaluaci├│nÔÇª";
+    submit.textContent = "Preparando evaluación…";
     try {
       const payload = await api("evaluaciones/iniciar/", {
         method: "POST",
         body: JSON.stringify({ estudiante: studentId, cuestionario: questionnaireId }),
       });
       state.questions = payload.cuestionario.preguntas || [];
-      if (!state.questions.length) throw new Error("Este cuestionario todav├¡a no tiene preguntas disponibles.");
-      if (state.questions.some((question) => !question.opciones.length)) throw new Error("Una o m├ís preguntas no tienen opciones configuradas. Solicita apoyo al administrador.");
+      if (!state.questions.length) throw new Error("Este cuestionario todavía no tiene preguntas disponibles.");
+      if (state.questions.some((question) => !question.opciones.length)) throw new Error("Una o más preguntas no tienen opciones configuradas. Solicita apoyo al administrador.");
       if (state.kind === "PERSONALIDAD" && state.questions.some((question) =>
         question.opciones.length !== 2 ||
         !personalityPairs.some((pair) => question.opciones.every((option) =>
@@ -348,7 +302,7 @@
       showNotice(error.message);
     } finally {
       submit.disabled = !state.students.some((student) => student.activo);
-      submit.innerHTML = 'Comenzar evaluaci├│n <span>ÔåÆ</span>';
+      submit.innerHTML = 'Comenzar evaluación <span>→</span>';
     }
   }
 
@@ -365,8 +319,8 @@
         <label class="answer-option"><input type="checkbox" name="answer" value="${option.id}" ${selected.includes(option.id) ? "checked" : ""}><span>${escapeHtml(option.texto)}</span></label>
       `).join("")}</div>`
       : `<div class="points-poles">
-          <span class="pole-card"><small>OPCI├ôN A</small>${escapeHtml(question.opciones[0].texto)}</span>
-          <span class="pole-card"><small>OPCI├ôN B</small>${escapeHtml(question.opciones[1].texto)}</span>
+          <span class="pole-card"><small>OPCIÓN A</small>${escapeHtml(question.opciones[0].texto)}</span>
+          <span class="pole-card"><small>OPCIÓN B</small>${escapeHtml(question.opciones[1].texto)}</span>
         </div>
         <label for="personalityPoints">Puntos para: ${escapeHtml(question.opciones[0].texto)}</label>
         <select id="personalityPoints">
@@ -382,11 +336,11 @@
       <div class="question-progress"><span>Pregunta ${state.currentQuestion + 1} de ${state.questions.length}</span><span>${percent}%</span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div>
       <h3 class="question-text">${escapeHtml(question.texto)}</h3>
-      <p class="form-help">${multi ? "Puedes elegir m├ís de una opci├│n." : "Distribuye 10 puntos entre las dos opciones. No se permite el reparto 5 y 5."}</p>
+      <p class="form-help">${multi ? "Puedes elegir más de una opción." : "Distribuye 10 puntos entre las dos opciones. No se permite el reparto 5 y 5."}</p>
       ${answerFields}
-      <div class="question-actions"><button type="button" data-action="previous" ${state.currentQuestion === 0 ? "disabled" : ""}>ÔåÉ Anterior</button>${
+      <div class="question-actions"><button type="button" data-action="previous" ${state.currentQuestion === 0 ? "disabled" : ""}>← Anterior</button>${
         multi ? '<button type="button" class="skip-button" data-action="skip" title="Deja esta pregunta sin contestar">Omitir</button>' : ""
-      }<button type="button" data-action="next">${state.currentQuestion === state.questions.length - 1 ? "Finalizar" : "Siguiente ÔåÆ"}</button></div>
+      }<button type="button" data-action="next">${state.currentQuestion === state.questions.length - 1 ? "Finalizar" : "Siguiente →"}</button></div>
       ${multi && state.answers.some((answer, index) => index !== state.currentQuestion && answer === SKIPPED)
         ? `<p class="form-help skipped-help">${plural(state.answers.filter((answer) => answer === SKIPPED).length, "pregunta omitida", "preguntas omitidas")}; puedes regresar a contestarlas.</p>`
         : ""}`;
@@ -401,8 +355,8 @@
         const b = $(".split-b", mount);
         a.style.width = chosen === null ? "50%" : `${chosen * 10}%`;
         b.style.width = chosen === null ? "50%" : `${(10 - chosen) * 10}%`;
-        a.textContent = chosen === null ? "A" : `A ┬À ${chosen}`;
-        b.textContent = chosen === null ? "B" : `B ┬À ${10 - chosen}`;
+        a.textContent = chosen === null ? "A" : `A · ${chosen}`;
+        b.textContent = chosen === null ? "B" : `B · ${10 - chosen}`;
         $(".points-split", mount).classList.toggle("is-pending", chosen === null);
       };
       points.addEventListener("change", updateOtherPoints);
@@ -428,7 +382,7 @@
     }
     const previous = state.answers[state.currentQuestion];
     if (skip) {
-      // VARK admite preguntas omitidas: se env├¡an sin opciones y el resultado las cuenta aparte.
+      // VARK admite preguntas omitidas: se envían sin opciones y el resultado las cuenta aparte.
       state.answers[state.currentQuestion] = SKIPPED;
       selected = [SKIPPED];
     } else if (selected.length) {
@@ -438,8 +392,8 @@
     }
     if (!selected.length && direction > 0) {
       showNotice(state.kind === "VARK"
-        ? "Selecciona al menos una respuesta o pulsa ┬½Omitir┬╗ para continuar."
-        : "Selecciona una distribuci├│n de puntos para continuar.");
+        ? "Selecciona al menos una respuesta o pulsa «Omitir» para continuar."
+        : "Selecciona una distribución de puntos para continuar.");
       return;
     }
     clearNotice();
@@ -465,7 +419,7 @@
     return max ? values.filter((item) => item.score === max).map((item) => labels[item.key]) : [];
   }
 
-  // Tipo observado; en un empate se muestran ambos polos (p. ej. ┬½S/N┬╗).
+  // Tipo observado; en un empate se muestran ambos polos (p. ej. «S/N»).
   function personalityType(scores) {
     return personalityAxes.map(([first, second]) => {
       const a = scores[first] || 0;
@@ -477,13 +431,13 @@
   function getInterpretation(scores) {
     if (state.kind === "VARK") {
       const top = varkTop(scores);
-      return `Preferencia${top.length > 1 ? "s" : ""} m├ís alta${top.length > 1 ? "s" : ""}: ${top.join(" y ") || "sin datos"}. Este resultado es una gu├¡a de reflexi├│n, no una etiqueta fija.`;
+      return `Preferencia${top.length > 1 ? "s" : ""} más alta${top.length > 1 ? "s" : ""}: ${top.join(" y ") || "sin datos"}. Este resultado es una guía de reflexión, no una etiqueta fija.`;
     }
     const type = personalityType(scores);
     const tie = type.includes("/")
-      ? " En los ejes marcados con ┬½/┬╗ obtuviste los mismos puntos en ambos polos."
+      ? " En los ejes marcados con «/» obtuviste los mismos puntos en ambos polos."
       : "";
-    return `Tendencia observada: ${type}.${tie} Es una s├¡ntesis orientativa de tus respuestas, no una evaluaci├│n cl├¡nica ni una descripci├│n completa de tu personalidad.`;
+    return `Tendencia observada: ${type}.${tie} Es una síntesis orientativa de tus respuestas, no una evaluación clínica ni una descripción completa de tu personalidad.`;
   }
 
   function scoresHtml(scores) {
@@ -515,11 +469,11 @@
     const { result, student, questionnaire, points } = data;
     const name = student ? `${student.nombres} ${student.apellidos}` : "Estudiante";
     const omitted = Number(result.preguntas_omitidas || 0);
-    $("#assessmentResultMeta").textContent = `${name} ┬À ${questionnaire?.titulo || "Cuestionario"}` +
-      (omitted ? ` ┬À ${plural(omitted, "pregunta omitida", "preguntas omitidas")}` : "");
+    $("#assessmentResultMeta").textContent = `${name} · ${questionnaire?.titulo || "Cuestionario"}` +
+      (omitted ? ` · ${plural(omitted, "pregunta omitida", "preguntas omitidas")}` : "");
     if (state.kind === "VARK") {
       const top = varkTop(points);
-      $("#resultHighlightLabel").textContent = top.length > 1 ? "PREFERENCIAS M├üS ALTAS" : "PREFERENCIA M├üS ALTA";
+      $("#resultHighlightLabel").textContent = top.length > 1 ? "PREFERENCIAS MÁS ALTAS" : "PREFERENCIA MÁS ALTA";
       $("#resultHighlight").textContent = top.join(" y ") || "Sin datos";
     } else {
       $("#resultHighlightLabel").textContent = "TENDENCIA OBSERVADA";
@@ -533,7 +487,7 @@
   async function finishAssessment() {
     const button = $('[data-action="next"]', $("#questionMount"));
     button.disabled = true;
-    button.textContent = "GuardandoÔÇª";
+    button.textContent = "Guardando…";
     try {
       const response = await api(`evaluaciones/${state.evaluationId}/responder/`, {
         method: "POST",
@@ -545,7 +499,7 @@
         }),
       });
       const result = response.resultado;
-      if (!result) throw new Error("La evaluaci├│n se guard├│, pero el resultado no pudo calcularse.");
+      if (!result) throw new Error("La evaluación se guardó, pero el resultado no pudo calcularse.");
       const points = Object.fromEntries(result.puntajes.map((score) => [score.dimension, Number(score.puntaje || 0)]));
       const student = state.active?.student;
       state.lastResult = {
@@ -558,17 +512,17 @@
         interpretation: getInterpretation(points),
       };
       renderResult(state.lastResult);
-      // Se conserva el grupo para seguir aplicando la evaluaci├│n al resto del grupo.
+      // Se conserva el grupo para seguir aplicando la evaluación al resto del grupo.
       const group = $("#groupSelect").value;
       $("#assessmentSetup").reset();
       $("#groupSelect").value = group;
       $("#assessmentSetup").hidden = true;
       $("#questionMount").hidden = true;
       $("#assessmentResult").hidden = false;
-      showNotice("Tu evaluaci├│n qued├│ registrada.", "success");
+      showNotice("Tu evaluación quedó registrada.", "success");
       $("#assessmentResult").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
-      showNotice(`No se pudo completar el guardado: ${error.message} Si la conexi├│n se interrumpi├│, contacta al administrador antes de volver a enviar para evitar duplicados.`);
+      showNotice(`No se pudo completar el guardado: ${error.message} Si la conexión se interrumpió, contacta al administrador antes de volver a enviar para evitar duplicados.`);
       button.disabled = false;
       button.textContent = "Reintentar guardado";
     }
@@ -598,7 +552,7 @@
     inputs[0]?.focus();
   }
 
-  // Env├¡a el mensaje a la API de contacto (POST /api/contacto/), que lo reenv├¡a por correo.
+  // Envía el mensaje a la API de contacto (POST /api/contacto/), que lo reenvía por correo.
   async function sendContact(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -606,7 +560,7 @@
     Object.keys(data).forEach((key) => { data[key] = String(data[key]).trim(); });
     const problems = [];
     if (!data.nombre) problems.push(["nombre", "tu nombre"]);
-    if (!EMAIL.test(data.correo || "")) problems.push(["correo", "un correo v├ílido"]);
+    if (!EMAIL.test(data.correo || "")) problems.push(["correo", "un correo válido"]);
     if (!data.asunto) problems.push(["asunto", "el asunto"]);
     if ((data.mensaje || "").length < 10) problems.push(["mensaje", "un mensaje de al menos 10 caracteres"]);
     if (problems.length) {
@@ -618,7 +572,7 @@
     $$("input, select, textarea", form).forEach((field) => field.removeAttribute("aria-invalid"));
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
-    button.textContent = "EnviandoÔÇª";
+    button.textContent = "Enviando…";
     try {
       const response = await fetch(`${API}contacto/`, {
         method: "POST",
@@ -627,7 +581,7 @@
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        // La API responde {detail: {campo: [mensajes]}} cuando un campo no es v├ílido.
+        // La API responde {detail: {campo: [mensajes]}} cuando un campo no es válido.
         if (body.detail && typeof body.detail === "object") {
           const fields = Object.keys(body.detail).filter((name) => name in contactFields);
           markContactErrors(form, fields, Object.values(body.detail).flat().join(" "));
@@ -636,12 +590,12 @@
         throw new Error(typeof body.detail === "string" ? body.detail : `Error ${response.status}.`);
       }
       form.reset();
-      showNotice("┬íGracias! Tu mensaje se envi├│ correctamente. Te responderemos al correo que indicaste.", "success");
+      showNotice("¡Gracias! Tu mensaje se envió correctamente. Te responderemos al correo que indicaste.", "success");
     } catch (error) {
-      markContactErrors(form, [], `No se pudo enviar el mensaje. ${error.message} Intenta de nuevo m├ís tarde.`);
+      markContactErrors(form, [], `No se pudo enviar el mensaje. ${error.message} Intenta de nuevo más tarde.`);
     } finally {
       button.disabled = false;
-      button.innerHTML = "Enviar mensaje <span>ÔåÆ</span>";
+      button.innerHTML = "Enviar mensaje <span>→</span>";
     }
   }
 
@@ -718,7 +672,7 @@
   setupVideo();
   routeTo(location.hash.slice(1) || "inicio");
   loadData().catch((error) => {
-    $("#connectionStatus").textContent = "Sin conexi├│n";
+    $("#connectionStatus").textContent = "Sin conexión";
     showNotice(`No fue posible conectar con la API. ${error.message}`);
   });
 })();

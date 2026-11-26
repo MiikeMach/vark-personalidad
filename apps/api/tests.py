@@ -315,11 +315,11 @@ class AuthAPITests(TestCase):
 
     def test_obtener_csrf_y_luego_login_ok(self):
         client = Client(enforce_csrf_checks=True)
-
+        
         resp = client.get("/api/auth/csrf/")
         self.assertEqual(resp.status_code, 200)
         csrf_token = client.cookies.get("csrftoken").value
-
+        
         resp = client.post(
             "/api/auth/login/",
             data=json.dumps({"username": "auth_activo", "password": "clave-auth-2026"}),
@@ -329,7 +329,9 @@ class AuthAPITests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
-# Control de acceso y seguridad de evaluaciones
+# =====================================================================
+# Control de acceso sobre /responder/ y /calcular/
+# =====================================================================
 
 class RequireStaffTests(TestCase):
     @classmethod
@@ -422,7 +424,7 @@ class AgregadosAPITests(TestCase):
         cls.cuestionario = Cuestionario.objects.create(
             titulo="VARK agregados", tipo=Cuestionario.Tipo.VARK,
         )
-
+        
         # Estudiante 1 y su evaluación
         evaluacion = Evaluacion.objects.create(
             estudiante=cls.estudiante, cuestionario=cls.cuestionario,
@@ -486,7 +488,7 @@ class AgregadosAPITests(TestCase):
             matricula="PRI-001", nombres="Solo", apellidos="Uno", grupo=grupo_p,
         )
         Evaluacion.objects.create(estudiante=estudiante_p, cuestionario=self.cuestionario)
-
+        
         respuesta = self.client.get(
             f"/api/resultados/agregados/?alcance=grupal&grupo={grupo_p.pk}&tipo=VARK"
         )
@@ -561,7 +563,7 @@ class PdfAPITests(TestCase):
         cls.estudiante = Estudiante.objects.create(
             matricula="PDF-001", nombres="Pía", apellidos="PDF", grupo=cls.grupo,
         )
-
+        
         # Datos para VARK
         cls.cuestionario_vark = Cuestionario.objects.create(
             titulo="VARK PDF", tipo=Cuestionario.Tipo.VARK,
@@ -777,3 +779,51 @@ class ManejoErroresAPITests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
         self.assertIn("debe ser un objeto", resp.json()["detail"])
+
+
+# =====================================================================
+# /api/estudiantes/: vista mínima para visitantes, completa para staff
+# =====================================================================
+
+class EstudiantesPublicoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.grupo = Grupo.objects.create(clave="PUB", nombre="Grupo público")
+        cls.activo = Estudiante.objects.create(
+            matricula="PUB-1", nombres="Ana", apellidos="Activa",
+            correo="ana@example.test", grupo=cls.grupo,
+        )
+        cls.inactivo = Estudiante.objects.create(
+            matricula="PUB-2", nombres="Iván", apellidos="Inactivo",
+            grupo=cls.grupo, activo=False,
+        )
+        cls.staff = get_user_model().objects.create_user(
+            username="pub_staff", password="clave-pub-2026", is_staff=True,
+        )
+
+    def test_visitante_solo_ve_activos_sin_datos_privados(self):
+        resp = self.client.get("/api/estudiantes/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual([e["id"] for e in data], [self.activo.id])
+        self.assertNotIn("matricula", data[0])
+        self.assertNotIn("correo", data[0])
+        self.assertEqual(data[0]["grupo"], self.grupo.id)
+
+    def test_visitante_no_puede_ver_detalle(self):
+        resp = self.client.get(f"/api/estudiantes/{self.activo.id}/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_visitante_no_puede_buscar(self):
+        resp = self.client.get("/api/estudiantes/?q=PUB-2&activo=false")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([e["id"] for e in resp.json()], [self.activo.id])
+
+    def test_staff_ve_todos_con_datos_completos(self):
+        self.client.force_login(self.staff)
+        resp = self.client.get("/api/estudiantes/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data), 2)
+        self.assertIn("matricula", data[0])
+        self.assertIn("correo", data[0])
