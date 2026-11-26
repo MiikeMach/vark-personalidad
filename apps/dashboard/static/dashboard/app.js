@@ -18,23 +18,74 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+
+  function getCookie(name) {
+    const cookies = document.cookie.split(";");
+
+    for (const cookie of cookies) {
+      const [key, ...value] = cookie.trim().split("=");
+
+      if (key === name) {
+        return decodeURIComponent(value.join("="));
+      }
+    }
+
+    return null;
+  }
+
   async function api(path, options = {}) {
+    const method = (options.method || "GET").toUpperCase();
+    const headers = {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    };
+
+    if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
+      if (!getCookie("csrftoken")) {
+        const csrfResponse = await fetch(`${API}auth/csrf/`, {
+          credentials: "same-origin",
+        });
+
+        if (!csrfResponse.ok) {
+          throw new Error("No se pudo inicializar la protección CSRF.");
+        }
+      }
+
+      const token = getCookie("csrftoken");
+
+      if (!token) {
+        throw new Error("No se encontró el token CSRF.");
+      }
+
+      headers["X-CSRFToken"] = token;
+    }
+
     const response = await fetch(`${API}${path}`, {
       ...options,
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      method,
+      credentials: "same-origin",
+      headers,
     });
+
     if (!response.ok) {
       let detail = `La solicitud falló (${response.status}).`;
+
       try {
         const body = await response.json();
-        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail || body);
+        detail =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail || body);
       } catch (_) {
-        // Keep the HTTP status when the server response is not JSON.
+        // Mantener el código HTTP si la respuesta no es JSON.
       }
+
       throw new Error(detail);
     }
+
     return response.status === 204 ? null : response.json();
   }
+
 
   function showNotice(message, type = "error") {
     const notice = $("#globalNotice");
@@ -164,43 +215,197 @@
       submit.innerHTML = 'Comenzar evaluación <span>→</span>';
     }
   }
-
   function renderQuestion() {
     const question = state.questions[state.currentQuestion];
     const mount = $("#questionMount");
     const multi = state.kind === "VARK";
     const selected = state.answers[state.currentQuestion] || [];
-    const percent = Math.round(((state.currentQuestion + 1) / state.questions.length) * 100);
-    mount.innerHTML = `
-      <div class="question-progress"><span>Pregunta ${state.currentQuestion + 1} de ${state.questions.length}</span><span>${percent}%</span></div>
-      <div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div>
+    const percent = Math.round(
+      ((state.currentQuestion + 1) / state.questions.length) * 100
+    );
+
+    const progressHtml = `
+      <div class="question-progress">
+        <span>Pregunta ${state.currentQuestion + 1} de ${state.questions.length}</span>
+        <span>${percent}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${percent}%"></div>
+      </div>
       <h3 class="question-text">${escapeHtml(question.texto)}</h3>
-      <p class="form-help">${multi ? "Puedes elegir más de una opción." : "Elige la opción que mejor te describa."}</p>
-      <div class="answer-list">${question.opciones.map((option) => `
-        <label class="answer-option"><input type="${multi ? "checkbox" : "radio"}" name="answer" value="${option.id}" ${selected.includes(option.id) ? "checked" : ""}><span>${escapeHtml(option.texto)}</span></label>
-      `).join("")}</div>
-      <div class="question-actions"><button type="button" data-action="previous" ${state.currentQuestion === 0 ? "disabled" : ""}>← Anterior</button><button type="button" data-action="next">${state.currentQuestion === state.questions.length - 1 ? "Finalizar" : "Siguiente →"}</button></div>`;
-    mount.querySelector('[data-action="previous"]').addEventListener("click", () => moveQuestion(-1));
-    mount.querySelector('[data-action="next"]').addEventListener("click", () => moveQuestion(1));
+    `;
+
+    let answersHtml;
+
+    if (multi) {
+      answersHtml = `
+        <p class="form-help">Puedes elegir más de una opción.</p>
+        <div class="answer-list">
+          ${question.opciones.map((option) => `
+            <label class="answer-option">
+              <input type="checkbox" name="answer" value="${option.id}"
+                ${selected.includes(option.id) ? "checked" : ""}>
+              <span>${escapeHtml(option.texto)}</span>
+            </label>
+          `).join("")}
+        </div>
+      `;
+    } else {
+      if (question.opciones.length !== 2) {
+        showNotice(
+          "Las preguntas de personalidad deben tener exactamente dos opciones."
+        );
+        return;
+      }
+
+      const first = question.opciones[0];
+      const second = question.opciones[1];
+
+      const savedPoints = Array.isArray(selected)
+        ? selected.find((item) => item.opcion === first.id)?.puntos
+        : undefined;
+
+      const points = Number.isInteger(savedPoints) ? savedPoints : 7;
+
+      answersHtml = `
+        <p class="form-help">
+          Distribuye 10 puntos entre las dos opciones.
+          No se permite repartir 5 y 5.
+        </p>
+
+        <div class="personality-distribution">
+          <div class="question-progress">
+            <span>${escapeHtml(first.texto)}</span>
+            <strong id="firstPoints">${points} puntos</strong>
+          </div>
+
+          <input
+            type="range"
+            id="personalitySlider"
+            min="0"
+            max="10"
+            step="1"
+            value="${points}"
+            style="width:100%"
+          >
+
+          <div class="question-progress">
+            <span>${escapeHtml(second.texto)}</span>
+            <strong id="secondPoints">${10 - points} puntos</strong>
+          </div>
+        </div>
+      `;
+    }
+
+    mount.innerHTML = `
+      ${progressHtml}
+      ${answersHtml}
+      <div class="question-actions">
+        <button type="button" data-action="previous"
+          ${state.currentQuestion === 0 ? "disabled" : ""}>
+          ← Anterior
+        </button>
+        <button type="button" data-action="next">
+          ${state.currentQuestion === state.questions.length - 1
+            ? "Finalizar"
+            : "Siguiente →"}
+        </button>
+      </div>
+    `;
+
+    if (!multi) {
+      const slider = $("#personalitySlider", mount);
+      const updatePoints = () => {
+        const points = Number(slider.value);
+        $("#firstPoints", mount).textContent = `${points} puntos`;
+        $("#secondPoints", mount).textContent = `${10 - points} puntos`;
+      };
+
+      slider.addEventListener("input", updatePoints);
+    }
+
+    mount.querySelector('[data-action="previous"]')
+      .addEventListener("click", () => moveQuestion(-1));
+
+    mount.querySelector('[data-action="next"]')
+      .addEventListener("click", () => moveQuestion(1));
   }
 
   function moveQuestion(direction) {
-    const selected = $$('input[name="answer"]:checked', $("#questionMount")).map((input) => Number(input.value));
-    state.answers[state.currentQuestion] = selected.length ? selected : null;
-    if (!selected.length && direction > 0) {
-      showNotice("Selecciona al menos una respuesta para continuar.");
-      return;
+    const mount = $("#questionMount");
+
+    if (state.kind === "VARK") {
+      const selected = $$('input[name="answer"]:checked', mount)
+        .map((input) => Number(input.value));
+
+      state.answers[state.currentQuestion] =
+        selected.length ? selected : null;
+
+      if (!selected.length && direction > 0) {
+        showNotice("Selecciona al menos una respuesta para continuar.");
+        return;
+      }
+    } else {
+      const question = state.questions[state.currentQuestion];
+
+      if (question.opciones.length !== 2) {
+        showNotice(
+          "Esta pregunta de personalidad no tiene exactamente dos opciones."
+        );
+        return;
+      }
+
+      const slider = $("#personalitySlider", mount);
+
+      if (!slider) {
+        showNotice("No se encontró el control de puntuación.");
+        return;
+      }
+
+      const firstPoints = Number(slider.value);
+      const secondPoints = 10 - firstPoints;
+
+      if (!Number.isInteger(firstPoints) ||
+          firstPoints < 0 ||
+          firstPoints > 10) {
+        showNotice("La distribución de puntos no es válida.");
+        return;
+      }
+
+      if (firstPoints === 5 && direction > 0) {
+        showNotice(
+          "No puedes asignar 5 y 5 puntos. Debes inclinarte por una opción."
+        );
+        return;
+      }
+
+      state.answers[state.currentQuestion] = [
+        {
+          opcion: question.opciones[0].id,
+          puntos: firstPoints,
+        },
+        {
+          opcion: question.opciones[1].id,
+          puntos: secondPoints,
+        },
+      ];
     }
+
     clearNotice();
+
     const next = state.currentQuestion + direction;
+
     if (next < 0) return;
+
     if (next === state.questions.length) {
       finishAssessment();
       return;
     }
+
     state.currentQuestion = next;
     renderQuestion();
   }
+
 
   function getInterpretation(scores) {
     if (state.kind === "VARK") {
@@ -221,10 +426,18 @@
       const response = await api(`evaluaciones/${state.evaluationId}/responder/`, {
         method: "POST",
         body: JSON.stringify({
-          respuestas: state.questions.map((question, index) => ({
-            pregunta: question.id,
-            opciones: state.answers[index] || [],
-          })),
+          respuestas: state.questions.map((question, index) => {
+            if (state.kind === "PERSONALIDAD") {
+              return {
+                pregunta: question.id,
+                selecciones: state.answers[index] || [],
+              };
+            }
+            return {
+              pregunta: question.id,
+              opciones: state.answers[index] || [],
+            };
+          }),
           calcular: true,
         }),
       });
