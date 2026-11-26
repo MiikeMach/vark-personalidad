@@ -779,3 +779,51 @@ class ManejoErroresAPITests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
         self.assertIn("debe ser un objeto", resp.json()["detail"])
+
+
+# =====================================================================
+# /api/estudiantes/: vista mínima para visitantes, completa para staff
+# =====================================================================
+
+class EstudiantesPublicoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.grupo = Grupo.objects.create(clave="PUB", nombre="Grupo público")
+        cls.activo = Estudiante.objects.create(
+            matricula="PUB-1", nombres="Ana", apellidos="Activa",
+            correo="ana@example.test", grupo=cls.grupo,
+        )
+        cls.inactivo = Estudiante.objects.create(
+            matricula="PUB-2", nombres="Iván", apellidos="Inactivo",
+            grupo=cls.grupo, activo=False,
+        )
+        cls.staff = get_user_model().objects.create_user(
+            username="pub_staff", password="clave-pub-2026", is_staff=True,
+        )
+
+    def test_visitante_solo_ve_activos_sin_datos_privados(self):
+        resp = self.client.get("/api/estudiantes/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual([e["id"] for e in data], [self.activo.id])
+        self.assertNotIn("matricula", data[0])
+        self.assertNotIn("correo", data[0])
+        self.assertEqual(data[0]["grupo"], self.grupo.id)
+
+    def test_visitante_no_puede_ver_detalle(self):
+        resp = self.client.get(f"/api/estudiantes/{self.activo.id}/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_visitante_no_puede_buscar(self):
+        resp = self.client.get("/api/estudiantes/?q=PUB-2&activo=false")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([e["id"] for e in resp.json()], [self.activo.id])
+
+    def test_staff_ve_todos_con_datos_completos(self):
+        self.client.force_login(self.staff)
+        resp = self.client.get("/api/estudiantes/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data), 2)
+        self.assertIn("matricula", data[0])
+        self.assertIn("correo", data[0])

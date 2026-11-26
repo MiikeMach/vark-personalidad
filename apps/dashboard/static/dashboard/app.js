@@ -167,7 +167,8 @@
     const group = $("#groupSelect").value;
     const students = state.students.filter((student) => student.activo && (!group || String(student.grupo) === group));
     setOptions($("#studentSelect"), students, group ? "No hay estudiantes en este grupo" : "No hay estudiantes disponibles",
-      (student) => `${student.nombres} ${student.apellidos} · ${student.matricula}`);
+      // Los visitantes no reciben la matrícula; el personal sí.
+      (student) => `${student.nombres} ${student.apellidos}${student.matricula ? ` · ${student.matricula}` : ""}`);
     $("#assessmentSetup").querySelector('button[type="submit"]').disabled = !students.length;
   }
 

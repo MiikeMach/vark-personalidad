@@ -248,9 +248,17 @@ class EstudianteListView(BaseListView):
     fields = ("matricula", "nombres", "apellidos", "correo", "grupo", "activo")
     ordering = ("apellidos", "nombres")
 
-    @require_staff
     def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        if request.user.is_staff:
+            return super().get(request, *args, **kwargs)
+        # Visitantes: solo lo necesario para elegir alumno en el sitio público.
+        # Sin matrícula, correo ni búsqueda; únicamente estudiantes activos.
+        qs = Estudiante.objects.filter(activo=True).order_by(*self.ordering)
+        grupo = _int_param(request, "grupo")
+        if grupo is not None:
+            qs = qs.filter(grupo_id=grupo)
+        data = [s.estudiante_publico_to_dict(o) for o in qs]
+        return JsonResponse(data, safe=False)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
