@@ -18,7 +18,9 @@
 
   {% if perms.results.view_resultado or perms.results.change_resultado %}
     {% include "admin/brujuela_results_dashboard.html" %}
-    <script src="{% static 'admin/js/brujuela-results.js' %}?v=1" defer></script>
+    <script src="{% static 'dashboard/vendor/jspdf.umd.min.js' %}?v=2.5.1" defer></script>
+    <script src="{% static 'dashboard/ficha.js' %}?v=4" defer></script>
+    <script src="{% static 'admin/js/brujuela-results.js' %}?v=7" defer></script>
   {% endif %}
 
   <div class="bru-dashboard-layout">

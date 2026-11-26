@@ -12,8 +12,10 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="{% static 'dashboard/styles.css' %}">
-  <script src="{% static 'dashboard/app.js' %}?v=2" defer></script>
+  <link rel="stylesheet" href="{% static 'dashboard/styles.css' %}?v=8">
+  <script src="{% static 'dashboard/vendor/jspdf.umd.min.js' %}?v=2.5.1" defer></script>
+  <script src="{% static 'dashboard/ficha.js' %}?v=4" defer></script>
+  <script src="{% static 'dashboard/app.js' %}?v=10" defer></script>
 </head>
 
 <body>
@@ -48,6 +50,16 @@
       <a class="nav-link" href="#guia" data-route="guia">
         <span class="nav-icon">✳</span>
         <span>Guía de uso</span>
+      </a>
+
+      <a class="nav-link nav-sublink" href="#guia" data-route="guia" data-scroll="guideVideo">
+        <span class="nav-icon">▶</span>
+        <span>Video de ayuda</span>
+      </a>
+
+      <a class="nav-link nav-sublink" href="#guia" data-route="guia" data-scroll="contacto">
+        <span class="nav-icon">✉</span>
+        <span>Contacto</span>
       </a>
 
     </nav>
@@ -219,6 +231,7 @@
               <span class="instrument-icon vark-icon">V</span>
               <span class="card-number">01 / VARK</span>
             </div>
+            <span class="card-count" data-count="VARK">Cargando cuestionarios…</span>
 
             <h3>Tu forma de aprender</h3>
 
@@ -250,6 +263,7 @@
               <span class="instrument-icon personality-icon">✳</span>
               <span class="card-number">02 / PERSONALIDAD</span>
             </div>
+            <span class="card-count" data-count="PERSONALIDAD">Cargando cuestionarios…</span>
 
             <h3>Tu forma de ser</h3>
 
@@ -333,6 +347,7 @@
                 <small>01 · PREFERENCIAS SENSORIALES</small>
                 <strong>Estilo de aprendizaje VARK</strong>
                 <small>Visual · Auditivo · Lectura/Escritura · Kinestésico</small>
+                <em class="choice-count" data-count="VARK"></em>
               </span>
 
               <span class="choice-arrow">→</span>
@@ -351,6 +366,7 @@
                 <small>02 · AUTOCONOCIMIENTO</small>
                 <strong>Personalidad · Jung / Myers-Briggs</strong>
                 <small>Explora tus preferencias y tendencias</small>
+                <em class="choice-count" data-count="PERSONALIDAD"></em>
               </span>
 
               <span class="choice-arrow">→</span>
@@ -388,9 +404,18 @@
             </p>
 
 
+            <button class="button button-outline" id="logoutButton" type="button" hidden>Cerrar sesión</button>
+
             <form id="assessmentSetup">
 
+              {% csrf_token %}
               <input type="hidden" name="tipo" value="VARK">
+
+              <label for="groupSelect">Grupo</label>
+
+              <select id="groupSelect" name="grupo">
+                <option value="">Todos los grupos</option>
+              </select>
 
               <label for="studentSelect">Estudiante</label>
 
@@ -409,20 +434,24 @@
                 <option value="">Cargando cuestionarios…</option>
               </select>
 
+              <div class="questionnaire-preview" id="questionnairePreview" hidden>
+                <div class="questionnaire-preview-head">
+                  <strong id="previewTitle"></strong>
+                  <span class="preview-chip" id="previewCount"></span>
+                </div>
+                <p id="previewDescription"></p>
+                <p class="preview-instructions" id="previewInstructions"></p>
+              </div>
+
 
               <button class="button button-primary full-button"
-                      type="submit">
+                      type="submit" disabled>
                 Comenzar evaluación <span>→</span>
               </button>
 
               <p class="form-help" id="setupHelp">
                 ¿No apareces en la lista? Solicita al administrador
                 que registre tu grupo y perfil.
-              </p>
-
-              <p class="form-help session-help" id="sessionHelp" hidden>
-                Para comenzar necesitas una sesión activa.
-                <a href="/admin/login/?next=/">Iniciar sesión</a>
               </p>
 
             </form>
@@ -432,6 +461,36 @@
                  class="question-mount"
                  hidden>
             </div>
+
+            <section id="assessmentResult" class="result-card" aria-labelledby="assessmentResultTitle" hidden>
+              <span class="result-badge">✓ EVALUACIÓN REGISTRADA</span>
+              <h3 id="assessmentResultTitle">Tu resultado orientativo</h3>
+              <p class="result-meta" id="assessmentResultMeta"></p>
+
+              <div class="result-highlight">
+                <small id="resultHighlightLabel"></small>
+                <strong id="resultHighlight"></strong>
+              </div>
+
+              <p class="result-interpretation" id="assessmentInterpretation"></p>
+              <ul class="result-scores" id="assessmentScores"></ul>
+
+              <div class="result-actions">
+                <button class="button button-primary" id="viewFicha" type="button">
+                  Ver ficha en PDF
+                </button>
+                <button class="button button-outline" id="downloadPdf" type="button">
+                  Descargar PDF <span>↓</span>
+                </button>
+                <button class="button button-outline" id="newAssessment" type="button">
+                  Nueva evaluación
+                </button>
+              </div>
+
+              <p class="form-help">
+                Guarda tu ficha: es una guía para reflexionar, no un diagnóstico.
+              </p>
+            </section>
 
           </div>
 
@@ -548,22 +607,90 @@
         </div>
 
 
-        <article class="content-card contact-card">
+        <!-- VIDEO -->
+        <article class="content-card video-card" id="guideVideo" aria-labelledby="video-heading">
 
-          <div>
-            <p class="eyebrow">¿NECESITAS AYUDA?</p>
-            <h2>Estamos para orientarte.</h2>
-
+          <div class="video-copy">
+            <p class="eyebrow">VIDEO DE INTRODUCCIÓN</p>
+            <h2 id="video-heading">¿Qué es Brújula y para qué sirve?</h2>
             <p class="card-subtitle">
-              Para dudas sobre tu evaluación o acceso,
-              contacta al equipo docente o al administrador del sitio.
+              Conoce el objetivo del sitio, cómo contestar los instrumentos
+              VARK y de personalidad, cómo leer tu resultado y algunos consejos
+              para aprovecharlo.
+            </p>
+            <ul class="video-topics">
+              <li><span>01</span>Objetivo y finalidad del sitio</li>
+              <li><span>02</span>Cómo contestar cada instrumento</li>
+              <li><span>03</span>Cómo leer y descargar tu ficha</li>
+              <li><span>04</span>Consejos para estudiar según tu estilo</li>
+            </ul>
+          </div>
+
+          <div class="video-frame">
+            <video id="introVideo" controls preload="metadata" playsinline>
+              <source src="{% static 'dashboard/video/brujula-intro.mp4' %}" type="video/mp4">
+            </video>
+            <div class="video-placeholder" id="videoPlaceholder" hidden>
+              <span aria-hidden="true">▶</span>
+              <strong>El video estará disponible pronto</strong>
+              <small>Mientras tanto, sigue los tres pasos de esta guía.</small>
+            </div>
+          </div>
+
+        </article>
+
+
+        <!-- CONTACTO -->
+        <article class="content-card contact-form-card" id="contacto" aria-labelledby="contact-heading">
+
+          <div class="contact-intro">
+            <p class="eyebrow">¿NECESITAS AYUDA?</p>
+            <h2 id="contact-heading">Escríbenos.</h2>
+            <p class="card-subtitle">
+              Para dudas sobre tu evaluación, tu acceso o tus resultados,
+              envía un mensaje al equipo de orientación.
+            </p>
+            <p class="contact-address">
+              Respuesta por correo
+              <strong>Te contestaremos a la dirección que escribas.</strong>
             </p>
           </div>
 
-          <a class="button button-outline"
-             href="mailto:?subject=Consulta%20sobre%20Br%C3%BAjula">
-            Escribir un correo <span>↗</span>
-          </a>
+          <form class="contact-form" id="contactForm" novalidate>
+
+            <div class="contact-row">
+              <div>
+                <label for="contactName">Nombre completo</label>
+                <input id="contactName" name="nombre" type="text" autocomplete="name" required maxlength="120">
+              </div>
+              <div>
+                <label for="contactEmail">Tu correo</label>
+                <input id="contactEmail" name="correo" type="email" autocomplete="email" required maxlength="160">
+              </div>
+            </div>
+
+            <label for="contactTopic">Asunto</label>
+            <select id="contactTopic" name="asunto" required>
+              <option value="">Selecciona un asunto</option>
+              <option>Duda sobre mi evaluación</option>
+              <option>Problema de acceso</option>
+              <option>Consulta sobre mis resultados</option>
+              <option>Otro</option>
+            </select>
+
+            <label for="contactMessage">Mensaje</label>
+            <textarea id="contactMessage" name="mensaje" rows="4" required minlength="10" maxlength="2000"
+                      placeholder="Cuéntanos en qué te podemos ayudar"></textarea>
+
+            <p class="contact-error" id="contactError" role="alert" hidden></p>
+
+            <button class="button button-primary" type="submit">
+              Enviar mensaje <span>→</span>
+            </button>
+            <p class="form-help">
+              Tu mensaje llega directamente al equipo de orientación.
+            </p>
+          </form>
 
         </article>
 

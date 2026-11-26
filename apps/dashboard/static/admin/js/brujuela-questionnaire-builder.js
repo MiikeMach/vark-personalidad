@@ -18,14 +18,51 @@
   const dimensions = { VARK: "VARK", PERSONALIDAD: "EISNTFJP" };
   const examples = window.bruQuestionnaireExamples;
 
+  const summary = builder.querySelector("[data-builder-summary]");
+  const typeHint = builder.querySelector("[data-builder-type-hint]");
+  const hints = {
+    VARK: "Asigna una dimensión VARK a cada opción. El estudiante podrá elegir varias.",
+    PERSONALIDAD: "Usa exactamente dos opciones de polos opuestos (por ejemplo, Extroversión e Introversión). El estudiante repartirá 10 puntos entre ellas.",
+  };
+
+  // Numeración, contadores, ayudas y dimensiones según el tipo de cuestionario.
   function updateHeadings() {
-    questions.querySelectorAll(".bru-builder-question").forEach((question, index) => {
+    const type = fields.type.value;
+    const isPersonality = type === "PERSONALIDAD";
+    let totalOptions = 0;
+    builder.dataset.type = type;  // Casilla cuadrada (VARK) o redonda (personalidad).
+    if (typeHint) typeHint.textContent = hints[type] || "";
+    const allQuestions = questions.querySelectorAll(".bru-builder-question");
+    allQuestions.forEach((question, index) => {
+      const options = question.querySelectorAll(".bru-builder-option");
+      totalOptions += options.length;
       question.querySelector("[data-question-heading]").textContent = `Pregunta ${index + 1}`;
+      question.querySelector("[data-question-number]").textContent = index + 1;
+      question.querySelector("[data-question-count]").textContent =
+        `${options.length} ${options.length === 1 ? "opción" : "opciones"}`;
+      question.querySelector("[data-options-hint]").textContent = isPersonality
+        ? "Dos opciones de polos opuestos"
+        : "El estudiante puede elegir varias";
       question.querySelector('[data-builder-action="remove-question"]').setAttribute("aria-label", `Eliminar pregunta ${index + 1}`);
-      question.querySelectorAll(".bru-builder-option").forEach((option, optionIndex) => {
+      // En personalidad cada pregunta lleva solo dos opciones.
+      question.querySelector('[data-builder-action="add-option"]').hidden = isPersonality && options.length >= 2;
+      options.forEach((option, optionIndex) => {
+        option.querySelector("[data-option-text]").placeholder = `Opción ${optionIndex + 1}`;
         option.querySelector('[data-builder-action="remove-option"]').setAttribute("aria-label", `Eliminar opción ${optionIndex + 1} de la pregunta ${index + 1}`);
+        option.querySelector("[data-option-text]").setAttribute("aria-label", `Texto de la opción ${optionIndex + 1} de la pregunta ${index + 1}`);
+        const select = option.querySelector("[data-option-dimension]");
+        select.querySelectorAll("optgroup").forEach((group) => {
+          const other = group.dataset.type !== type;
+          group.hidden = other;
+          group.disabled = other && !group.querySelector(`option[value="${select.value}"]`);
+        });
+        option.dataset.dimension = select.value;
       });
     });
+    questions.querySelectorAll("[data-question-text]").forEach(autosize);
+    if (summary) {
+      summary.textContent = `${allQuestions.length} ${allQuestions.length === 1 ? "pregunta" : "preguntas"} · ${totalOptions} ${totalOptions === 1 ? "opción" : "opciones"}`;
+    }
   }
 
   function addOption(question, text = "", dimension = "") {
@@ -95,39 +132,87 @@
     return draft;
   }
 
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  // Vista previa con el aspecto del formulario que contesta el estudiante (no guarda nada).
   function showPreview(draft) {
     previewContent.replaceChildren();
-    const title = document.createElement("h3");
-    title.textContent = draft.titulo;
-    previewContent.append(title);
-    if (draft.instrucciones) {
-      const instructions = document.createElement("p");
-      instructions.textContent = draft.instrucciones;
-      previewContent.append(instructions);
-    }
-    const list = document.createElement("ol");
-    draft.preguntas.forEach((question) => {
-      const item = document.createElement("li");
-      const text = document.createElement("strong");
-      text.textContent = question.texto;
-      const options = document.createElement("ul");
-      question.opciones.forEach((option) => {
-        const row = document.createElement("li");
-        row.textContent = option.texto;
-        options.append(row);
-      });
-      item.append(text, options);
-      list.append(item);
+    const isPersonality = draft.tipo === "PERSONALIDAD";
+    const form = element("form", "bru-preview-form");
+    form.addEventListener("submit", (event) => event.preventDefault());
+
+    const header = element("header", "bru-preview-header");
+    header.append(
+      element("span", "bru-preview-type", isPersonality ? "Personalidad" : "VARK · Estilos de aprendizaje"),
+      element("h3", "", draft.titulo),
+    );
+    if (draft.descripcion) header.append(element("p", "", draft.descripcion));
+    if (draft.instrucciones) header.append(element("p", "bru-preview-instructions", draft.instrucciones));
+    header.append(element("small", "", `${draft.preguntas.length} ${draft.preguntas.length === 1 ? "pregunta" : "preguntas"}`));
+    form.append(header);
+
+    draft.preguntas.forEach((question, index) => {
+      const card = element("fieldset", "bru-preview-question");
+      card.append(element("legend", "", `${index + 1}. ${question.texto}`));
+      if (isPersonality && question.opciones.length === 2) {
+        card.append(element("p", "bru-preview-help", "Reparte 10 puntos entre las dos opciones (no se permite 5 y 5)."));
+        const row = element("div", "bru-preview-points");
+        const label = element("label", "", `Puntos para «${question.opciones[0].texto}»`);
+        const select = element("select");
+        select.append(new Option("Selecciona", ""));
+        [0, 1, 2, 3, 4, 6, 7, 8, 9, 10].forEach((points) => select.append(new Option(String(points), String(points))));
+        const other = element("p", "bru-preview-help", `Puntos para «${question.opciones[1].texto}»: pendientes.`);
+        select.addEventListener("change", () => {
+          other.textContent = select.value === ""
+            ? `Puntos para «${question.opciones[1].texto}»: pendientes.`
+            : `Puntos para «${question.opciones[1].texto}»: ${10 - Number(select.value)}.`;
+        });
+        label.append(select);
+        row.append(label, other);
+        card.append(row);
+      } else {
+        card.append(element("p", "bru-preview-help", "Puedes elegir más de una opción."));
+        question.opciones.forEach((option) => {
+          const label = element("label", "bru-preview-option");
+          const input = element("input");
+          input.type = "checkbox";
+          input.name = `preview-${index}`;
+          label.append(input, element("span", "", option.texto));
+          card.append(label);
+        });
+      }
+      form.append(card);
     });
-    previewContent.append(list);
+    const submit = element("button", "bru-builder-primary", "Finalizar");
+    submit.type = "submit";
+    submit.disabled = true;
+    submit.title = "Solo vista previa";
+    form.append(submit);
+    previewContent.append(form);
     preview.hidden = false;
-    status.textContent = "Vista previa lista. El borrador todavía no está guardado en la base de datos.";
+    status.textContent = "Vista previa lista. Así lo verá el estudiante; el borrador todavía no está guardado.";
     preview.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  builder.addEventListener("input", () => {
+  // El texto de la pregunta crece con lo que se escribe, como en un formulario.
+  function autosize(textarea) {
+    if (textarea.offsetParent === null) return;  // Aún oculto: se mide al mostrarse.
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+  builder.addEventListener("input", (event) => {
+    if (preview.contains(event.target)) return;  // Contestar la vista previa no cambia el borrador.
+    if (event.target.matches("[data-question-text]")) autosize(event.target);
     preview.hidden = true;
     status.textContent = "";
+  });
+  builder.addEventListener("change", (event) => {
+    if (event.target === fields.type || event.target.matches("[data-option-dimension]")) updateHeadings();
   });
   builder.addEventListener("click", (event) => {
     const button = event.target.closest("[data-builder-action]");
@@ -177,6 +262,7 @@
       fields.instructions.value = "Selecciona la opción que mejor describa tu preferencia.";
       questions.replaceChildren();
       example.questions.forEach(addQuestion);
+      updateHeadings();
       preview.hidden = true;
       status.textContent = "Ejemplo ficticio cargado. Puedes modificarlo antes de revisarlo.";
     } else if (action === "preview") {

@@ -1,0 +1,98 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block title %}Sesión cerrada · Brújula{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/brujuela-login.css' %}">
+<style>
+  .bru-logout-card { text-align: center; }
+  .bru-logout-check {
+    display: grid; place-items: center; width: 64px; height: 64px; margin: 4px auto 18px;
+    border-radius: 50%; background: #e5f2e9; color: #28775f; font-size: 28px; font-weight: 700;
+  }
+  .bru-logout-card h2 { margin: 0 0 8px; font-size: 24px; color: #24362d; }
+  .bru-logout-card p { margin: 0 auto; max-width: 340px; color: #65776b; line-height: 1.6; }
+  .bru-logout-card .bru-logout-timer {
+    margin: 24px auto 8px; font-size: 13px; color: #52675a;
+  }
+  .bru-logout-actions a.bru-submit,
+  .bru-logout-actions a.bru-submit:visited,
+  .bru-logout-actions a.bru-submit:hover { color: #fff; }
+  .bru-logout-timer strong { color: #28775f; }
+  .bru-logout-progress {
+    height: 6px; margin: 0 0 24px; border-radius: 999px; background: #edf2ee; overflow: hidden;
+  }
+  .bru-logout-progress span {
+    display: block; height: 100%; width: 100%; border-radius: inherit;
+    background: linear-gradient(90deg, #28775f, #63a881);
+    animation: bru-logout-countdown 5s linear forwards;
+  }
+  @keyframes bru-logout-countdown { from { width: 100%; } to { width: 0; } }
+  .bru-logout-actions { display: grid; gap: 10px; }
+  .bru-logout-actions a { text-decoration: none; justify-content: center; }
+  .bru-logout-secondary {
+    display: flex; align-items: center; justify-content: center; min-height: 46px;
+    border: 1px solid #cfe0d4; border-radius: 10px; color: #205e4c; font-weight: 600; background: #fff;
+  }
+  .bru-logout-secondary:hover { background: #f0f6f1; }
+  .bru-logout-stay { margin-top: 14px; border: 0; background: none; color: #7b8980; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .bru-logout-stay[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { .bru-logout-progress span { animation: none; } }
+</style>
+{% endblock %}
+
+{% block bodyclass %}login bru-logged-out{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div class="bru-login-shell">
+  <section class="bru-login-copy" aria-label="Sesión cerrada">
+    <span class="bru-login-kicker">HASTA PRONTO</span>
+    <h1>Gracias por tu <em>tiempo.</em></h1>
+    <p>Tu sesión del panel de gestión se cerró de forma segura. Puedes seguir explorando los instrumentos desde el sitio público.</p>
+    <a href="{% url 'home' %}" class="bru-public-link">← Volver al sitio público</a>
+  </section>
+
+  <section class="bru-login-card bru-logout-card" aria-live="polite">
+    <span class="bru-logout-check" aria-hidden="true">✓</span>
+    <h2>Sesión cerrada</h2>
+    <p>Por seguridad, si usas una computadora compartida cierra también el navegador.</p>
+
+    <p class="bru-logout-timer" id="logoutTimer">
+      Te llevaremos al inicio en <strong id="logoutSeconds">5</strong> segundos…
+    </p>
+    <div class="bru-logout-progress" id="logoutProgress" aria-hidden="true"><span></span></div>
+
+    <div class="bru-logout-actions">
+      <a class="bru-submit" href="{% url 'home' %}#inicio">Ir al inicio <span>→</span></a>
+      <a class="bru-logout-secondary" href="{% url 'admin:index' %}">Iniciar sesión de nuevo</a>
+    </div>
+    <button type="button" class="bru-logout-stay" id="logoutStay">Quedarme en esta página</button>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const destino = "{% url 'home' %}#inicio";
+    const segundos = document.getElementById("logoutSeconds");
+    let restantes = 5;
+    const reloj = setInterval(() => {
+      restantes -= 1;
+      segundos.textContent = Math.max(restantes, 0);
+      if (restantes <= 0) {
+        clearInterval(reloj);
+        window.location.assign(destino);
+      }
+    }, 1000);
+    document.getElementById("logoutStay").addEventListener("click", (event) => {
+      clearInterval(reloj);
+      document.getElementById("logoutTimer").textContent = "Redirección cancelada. Usa los botones para continuar.";
+      document.getElementById("logoutProgress").hidden = true;
+      event.currentTarget.hidden = true;
+    });
+  })();
+</script>
+{% endblock %}

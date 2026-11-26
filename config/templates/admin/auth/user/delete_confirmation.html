@@ -1,0 +1,66 @@
+{% extends "admin/delete_confirmation.html" %}
+{% load admin_urls %}
+
+{% block bodyclass %}{{ block.super }} bru-user-edit bru-user-delete{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Inicio</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">Usuarios</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'change' object.pk|admin_urlquote %}">{{ object.get_username }}</a>
+&rsaquo; Eliminar
+</div>
+{% endblock %}
+
+{% block content_title %}<h1>Eliminar usuario</h1>{% endblock %}
+
+{% block content %}
+<div class="bru-delete">
+  <section class="bru-user-intro bru-delete-card" aria-labelledby="bru-delete-name">
+    <span class="bru-user-avatar is-danger" aria-hidden="true">{{ object.first_name|first|default:object.get_username|first|upper }}{{ object.last_name|first|upper }}</span>
+    <div class="bru-user-intro-text">
+      <span class="bru-user-kicker is-danger">CUENTA A ELIMINAR</span>
+      <h2 id="bru-delete-name">{{ object.get_full_name|default:object.get_username }}</h2>
+      <p>@{{ object.get_username }}{% if object.email %} · {{ object.email }}{% endif %}</p>
+    </div>
+    <ul class="bru-user-badges" aria-label="Estado de la cuenta">
+      <li class="{% if object.is_active %}is-ok{% else %}is-off{% endif %}">{% if object.is_active %}Activa{% else %}Inactiva{% endif %}</li>
+      {% for rol in object.groups.all %}<li>{{ rol.name }}</li>{% empty %}<li class="is-off">Sin rol</li>{% endfor %}
+      {% if object.date_joined %}<li class="is-muted">Desde {{ object.date_joined|date:"d/m/Y" }}</li>{% endif %}
+    </ul>
+  </section>
+
+  {% if perms_lacking or protected %}
+  <section class="bru-delete-panel is-blocked" role="alert">
+    <strong>No se puede eliminar esta cuenta</strong>
+    <p>{% if perms_lacking %}Tu cuenta no tiene permiso para eliminar estos registros relacionados:{% else %}Estos registros relacionados impiden eliminarla:{% endif %}</p>
+    <ul>{% if perms_lacking %}{{ perms_lacking|unordered_list }}{% else %}{{ protected|unordered_list }}{% endif %}</ul>
+    <div class="bru-delete-actions">
+      <a class="button bru-delete-cancel" href="{% url opts|admin_urlname:'changelist' %}">Volver a usuarios</a>
+    </div>
+  </section>
+  {% else %}
+  <section class="bru-delete-panel" aria-labelledby="bru-delete-question">
+    <strong id="bru-delete-question">¿Seguro que quieres eliminar esta cuenta?</strong>
+    <ul class="bru-delete-effects">
+      <li>La persona ya no podrá iniciar sesión.</li>
+      <li>Se quitarán sus roles y permisos.</li>
+      {% if object.perfil_estudiante %}<li>El registro del estudiante <b>{{ object.perfil_estudiante }}</b> se conserva, pero queda sin cuenta vinculada.</li>{% endif %}
+      <li>Esta acción <b>no se puede deshacer</b>.</li>
+    </ul>
+    {% if object.is_active %}
+    <p class="bru-delete-tip">¿Solo quieres bloquear el acceso? <a href="{% url opts|admin_urlname:'change' object.pk|admin_urlquote %}">Desactiva la cuenta</a> desde «Editar»; podrás reactivarla después.</p>
+    {% endif %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="post" value="yes">
+      {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+      {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+      <div class="bru-delete-actions">
+        <a class="button bru-delete-cancel" href="{% url opts|admin_urlname:'changelist' %}">Cancelar</a>
+        <button type="submit" class="bru-delete-confirm">Sí, eliminar cuenta</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock content %}

@@ -115,27 +115,106 @@
     delete: "Eliminar",
     view: "Ver",
   };
-  const permissionIds = new Map();
-
-  document.querySelectorAll("#id_permissions option, #id_user_permissions option").forEach((option) => {
-    const parts = option.textContent.split(" | ");
-    if (parts.length !== 3) return;
+  function describePermission(text) {
+    const parts = text.split(" | ");
+    if (parts.length !== 3) return text;
     const match = /^Can (add|change|delete|view) (.+)$/.exec(parts[2]);
-    if (!match) return;
-    if (option.closest("select").id === "id_permissions") {
-      const key = `${parts[0]}|${parts[1]}|${match[1]}|${match[2]}`;
-      const ids = permissionIds.get(key) || [];
-      ids.push(option.value);
-      permissionIds.set(key, ids);
-    }
+    if (!match) return text;
     const model = permissionModels[`${parts[1].toLowerCase()}|${match[2].toLowerCase()}`];
-    if (!model) return;
+    if (!model) return text;
     const app = isUserAdmin && parts[0] === "Autenticación y Autorización"
       ? "Usuarios y acceso" : parts[0];
-    option.textContent = `${permissionActions[match[1]]} ${model} — ${app}`;
+    return `${permissionActions[match[1]]} ${model} — ${app}`;
+  }
+
+  document.querySelectorAll("#id_permissions option, #id_user_permissions option").forEach((option) => {
+    option.textContent = describePermission(option.textContent);
   });
 
+  const templatePanel = document.getElementById("bru-user-template-preview");
+  if (templatePanel) {
+    const templates = JSON.parse(document.getElementById("bru-user-templates-data").textContent);
+    const select = document.getElementById("id_rol");
+    const description = document.getElementById("bru-user-template-description");
+    const access = document.getElementById("bru-user-template-access");
+    const status = document.getElementById("bru-user-template-status");
+    const list = document.getElementById("bru-user-template-permissions");
+    if (select) {
+      templatePanel.hidden = false;
+      // Coloca el panel justo debajo de la lista desplegable del rol.
+      const row = select.closest(".form-row");
+      if (row) row.after(templatePanel);
+    }
+
+    const render = () => {
+      const template = select && templates.find((item) => item.key === select.value);
+      list.replaceChildren();
+      if (!template) {
+        description.textContent = "Elige un rol para ver sus permisos.";
+        access.textContent = "";
+        status.textContent = "";
+        return;
+      }
+      description.textContent = `${template.name}: ${template.description}` +
+        (template.exists ? "" : " El rol se creará al guardar.");
+      access.textContent = template.staff
+        ? "Podrá entrar al panel administrativo."
+        : "No tendrá acceso al panel administrativo.";
+      if (template.all_permissions) {
+        status.textContent = "Incluye todos los permisos de administración.";
+      } else if (!template.permissions.length) {
+        status.textContent = "Este rol no tiene permisos de administración.";
+      } else {
+        status.textContent = `${template.permissions.length} permiso(s) del rol:`;
+        template.permissions.forEach((permission) => {
+          const item = document.createElement("li");
+          item.textContent = describePermission(permission);
+          list.append(item);
+        });
+      }
+    };
+    if (select) select.addEventListener("change", render);
+    render();
+  }
+
+  // Tablas de preguntas y opciones dentro de un cuestionario o una pregunta.
+  function improveInlineTables() {
+    const inlineTexts = {
+      // Las preguntas del cuestionario usan tarjetas propias (brujuela-preguntas.js).
+      opciones: { link: "Editar", add: "Agregar opción" },
+    };
+    Object.entries(inlineTexts).forEach(([prefix, texts]) => {
+      const group = document.getElementById(`${prefix}-group`);
+      if (!group) return;
+      group.classList.add("bru-inline-questions");
+      group.querySelectorAll("td.original p").forEach((paragraph) => {
+        // Quita el texto técnico («Pregunta 1 - …») y deja solo el enlace.
+        paragraph.childNodes.forEach((node) => {
+          if (node.nodeType === Node.TEXT_NODE) node.textContent = "";
+        });
+        const link = paragraph.querySelector("a.inlinechangelink");
+        if (link) {
+          link.textContent = texts.link;
+          link.classList.add("bru-inline-edit");
+        }
+      });
+      // Django crea el enlace «Agregar otro/a …» al cargar; se renombra cuando aparece.
+      const renameAddLink = () => {
+        const addLink = group.querySelector(".add-row a");
+        if (addLink && addLink.textContent !== texts.add) addLink.textContent = texts.add;
+        return Boolean(addLink);
+      };
+      if (!renameAddLink()) {
+        const observer = new MutationObserver(() => {
+          if (renameAddLink()) observer.disconnect();
+        });
+        observer.observe(group, { childList: true, subtree: true });
+      }
+    });
+  }
+
   window.addEventListener("load", () => {
+    improveInlineTables();
     ["id_permissions", "id_user_permissions"].forEach((id) => {
       const available = document.querySelector(`#${id}_from_title label`);
       const selected = document.querySelector(`#${id}_to_title label`);
@@ -159,37 +238,15 @@
       return;
     }
 
-    const permissionKey = (app, model, action, original = model) => `${app}|${model}|${action}|${original}`;
-    const students = (model, action) => permissionKey("Estudiantes y grupos", model, action);
-    const session = (action) => permissionKey("Sesiones", "período de sesiones", action, "session");
-    const questionnaire = (model) => permissionKey("Cuestionarios", model, "view");
-    const assessment = (model, action = "view") => permissionKey("Evaluaciones y respuestas", model, action);
-    const result = (model) => permissionKey("Resultados y puntajes", model, "view");
-    const consultation = [
-      students("Estudiante", "view"), students("Grupo", "view"), session("view"),
-      questionnaire("Cuestionario"), questionnaire("pregunta"), questionnaire("opcion"),
-      assessment("Evaluación"), assessment("respuesta"), assessment("seleccion respuesta"),
-      result("Resultado"), result("puntaje dimension"),
-    ];
-    const presets = {
-      administrador: { name: "Administrador", all: true },
-      coordinador: {
-        name: "Coordinador",
-        permissions: [
-          ...consultation,
-          students("Estudiante", "add"), students("Estudiante", "change"),
-          students("Grupo", "add"), students("Grupo", "change"),
-          session("add"), session("change"),
-          assessment("Evaluación", "add"), assessment("Evaluación", "change"),
-        ],
-      },
-      docente: {
-        name: "Docente",
-        permissions: [...consultation, assessment("Evaluación", "add")],
-      },
-      consultor: { name: "Consultor / Psicopedagogo", permissions: consultation },
-      estudiante: { name: "Estudiante", permissions: [] },
-    };
+    const presetData = document.getElementById("bru-role-templates-data");
+    const presets = Object.fromEntries(
+      (presetData ? JSON.parse(presetData.textContent) : []).map((item) => [item.key, {
+        name: item.name, all: item.all, permissions: item.permission_ids,
+      }])
+    );
+    const availableIds = new Set(
+      [...window.SelectBox.cache[from.id], ...window.SelectBox.cache[to.id]].map((option) => option.value)
+    );
     const isAdd = presetPanel.dataset.add === "true";
     const name = document.getElementById("id_name");
     const nameRow = name && name.closest(".form-row");
@@ -258,14 +315,13 @@
 
       const desired = [];
       if (!preset.all) {
-        for (const key of preset.permissions) {
-          const ids = permissionIds.get(key);
-          if (!ids || ids.length !== 1) {
-            status.textContent = "No se pudo identificar un permiso requerido de forma única. No se modificó la selección.";
+        for (const id of preset.permissions) {
+          if (!availableIds.has(id)) {
+            status.textContent = "No se encontró un permiso requerido por la plantilla. No se modificó la selección.";
             roleSelect.value = appliedRole;
             return;
           }
-          desired.push(ids[0]);
+          desired.push(id);
         }
       }
 

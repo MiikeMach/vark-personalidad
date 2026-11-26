@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase, override_settings, Client
+from django.test import Client, TestCase, override_settings
 
 from apps.assessments.models import Evaluacion, Respuesta
 from apps.questionnaires.models import Cuestionario, Pregunta, Opcion
@@ -135,6 +135,114 @@ class FlujoEvaluacionAPITests(TestCase):
         self.assertEqual(respuesta.status_code, 403)
 
 
+class EvaluacionEstudianteAPITests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        grupo = Grupo.objects.create(clave="PUBLICO", nombre="Grupo público")
+        cls.estudiante = Estudiante.objects.create(
+            matricula="PUB-1", nombres="Ana", apellidos="Prueba", grupo=grupo
+        )
+        cls.otro = Estudiante.objects.create(
+            matricula="PUB-2", nombres="Luis", apellidos="Prueba", grupo=grupo
+        )
+        cls.cuestionario = Cuestionario.objects.create(titulo="VARK", tipo="VARK")
+        cls.pregunta = Pregunta.objects.create(cuestionario=cls.cuestionario, texto="P", orden=1)
+        cls.opcion = Opcion.objects.create(pregunta=cls.pregunta, texto="V", dimension="V", orden=1)
+
+    def iniciar(self, estudiante):
+        return self.client.post(
+            "/api/evaluaciones/iniciar/",
+            data=json.dumps({"estudiante": estudiante.pk, "cuestionario": self.cuestionario.pk}),
+            content_type="application/json",
+        )
+
+    def responder(self, evaluacion):
+        return self.client.post(
+            f"/api/evaluaciones/{evaluacion.pk}/responder/",
+            data=json.dumps({
+                "respuestas": [{"pregunta": self.pregunta.pk, "opciones": [self.opcion.pk]}],
+                "calcular": True,
+            }),
+            content_type="application/json",
+        )
+
+    def test_estudiante_sin_cuenta_guarda_su_evaluacion(self):
+        inicio = self.iniciar(self.estudiante)
+        self.assertEqual(inicio.status_code, 201)
+        self.assertEqual(self.iniciar(self.estudiante).json()["evaluacion"]["id"], inicio.json()["evaluacion"]["id"])
+        evaluacion = Evaluacion.objects.get(pk=inicio.json()["evaluacion"]["id"])
+        respuesta = self.responder(evaluacion)
+        self.assertEqual(respuesta.status_code, 200)
+        evaluacion.refresh_from_db()
+        self.assertEqual(evaluacion.estado, Evaluacion.Estado.FINALIZADA)
+        self.assertEqual(Resultado.objects.get(evaluacion=evaluacion).puntajes.get(dimension="V").puntaje, 1)
+
+    def test_otra_sesion_no_puede_responder_ni_reutilizar_evaluacion(self):
+        inicio = self.iniciar(self.estudiante)
+        evaluacion = Evaluacion.objects.get(pk=inicio.json()["evaluacion"]["id"])
+        otro_cliente = Client()
+        respuesta = otro_cliente.post(
+            f"/api/evaluaciones/{evaluacion.pk}/responder/",
+            data=json.dumps({"respuestas": [{"pregunta": self.pregunta.pk, "opciones": [self.opcion.pk]}]}),
+            content_type="application/json",
+        )
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertFalse(Respuesta.objects.filter(evaluacion=evaluacion).exists())
+        self.assertFalse(Resultado.objects.filter(evaluacion=evaluacion).exists())
+        nuevo = otro_cliente.post(
+            "/api/evaluaciones/iniciar/",
+            data=json.dumps({"estudiante": self.estudiante.pk, "cuestionario": self.cuestionario.pk}),
+            content_type="application/json",
+        )
+        self.assertEqual(nuevo.status_code, 201)
+        self.assertNotEqual(nuevo.json()["evaluacion"]["id"], evaluacion.pk)
+
+    def test_estudiante_inactivo_no_puede_iniciar_ni_guardar(self):
+        inicio = self.iniciar(self.estudiante)
+        evaluacion = Evaluacion.objects.get(pk=inicio.json()["evaluacion"]["id"])
+        self.estudiante.activo = False
+        self.estudiante.save(update_fields=["activo"])
+        self.assertEqual(self.iniciar(self.estudiante).status_code, 403)
+        self.assertEqual(self.responder(evaluacion).status_code, 403)
+
+    def test_autenticacion_y_escritura_requieren_csrf(self):
+        client = Client(enforce_csrf_checks=True)
+        client.get("/")
+        login = {"username": "alumno", "password": "clave-de-prueba"}
+        self.assertEqual(client.post("/api/auth/login/", json.dumps(login), content_type="application/json").status_code, 403)
+        token = client.cookies["csrftoken"].value
+        data = json.dumps({"estudiante": self.estudiante.pk, "cuestionario": self.cuestionario.pk})
+        self.assertEqual(client.post("/api/evaluaciones/iniciar/", data, content_type="application/json").status_code, 403)
+        inicio = client.post("/api/evaluaciones/iniciar/", data, content_type="application/json", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(inicio.status_code, 201)
+        url = f"/api/evaluaciones/{inicio.json()['evaluacion']['id']}/responder/"
+        answers = json.dumps({"respuestas": [{"pregunta": self.pregunta.pk, "opciones": [self.opcion.pk]}], "calcular": True})
+        self.assertEqual(client.post(url, answers, content_type="application/json").status_code, 403)
+        self.assertEqual(client.post(url, answers, content_type="application/json", HTTP_X_CSRFTOKEN=token).status_code, 200)
+
+    def test_personalidad_sin_cuenta_guarda_y_calcula(self):
+        cuestionario = Cuestionario.objects.create(titulo="Personalidad", tipo="PERSONALIDAD")
+        pregunta = Pregunta.objects.create(cuestionario=cuestionario, texto="P", orden=1)
+        opcion_e = Opcion.objects.create(pregunta=pregunta, texto="E", dimension="E", orden=1)
+        opcion_i = Opcion.objects.create(pregunta=pregunta, texto="I", dimension="I", orden=2)
+        inicio = self.client.post(
+            "/api/evaluaciones/iniciar/",
+            data=json.dumps({"estudiante": self.otro.pk, "cuestionario": cuestionario.pk}),
+            content_type="application/json",
+        )
+        self.assertEqual(inicio.status_code, 201)
+        evaluacion_id = inicio.json()["evaluacion"]["id"]
+        respuesta = self.client.post(
+            f"/api/evaluaciones/{evaluacion_id}/responder/",
+            data=json.dumps({"respuestas": [{"pregunta": pregunta.pk, "selecciones": [
+                {"opcion": opcion_e.pk, "puntos": 7}, {"opcion": opcion_i.pk, "puntos": 3},
+            ]}], "calcular": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        self.assertEqual(Resultado.objects.get(evaluacion_id=evaluacion_id).puntajes.get(dimension="E").puntaje, 7)
+
+
 # =====================================================================
 # Autenticación por API
 # =====================================================================
@@ -221,9 +329,7 @@ class AuthAPITests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
-# =====================================================================
-# require_staff
-# =====================================================================
+# Control de acceso y seguridad de evaluaciones
 
 class RequireStaffTests(TestCase):
     @classmethod
@@ -249,12 +355,12 @@ class RequireStaffTests(TestCase):
             content_type="application/json",
         )
 
-    def test_responder_sin_sesion_401(self):
-        self.assertEqual(self._post_responder().status_code, 401)
+    def test_responder_evaluacion_inexistente_404(self):
+        self.assertEqual(self._post_responder().status_code, 404)
 
-    def test_responder_no_staff_403(self):
+    def test_responder_no_staff_evaluacion_inexistente_404(self):
         self.client.force_login(self.no_staff)
-        self.assertEqual(self._post_responder().status_code, 403)
+        self.assertEqual(self._post_responder().status_code, 404)
 
     def test_calcular_sin_sesion_401(self):
         self.assertEqual(self._post_calcular().status_code, 401)

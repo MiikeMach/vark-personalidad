@@ -68,11 +68,10 @@ def _str_param(request, name):
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CsrfTokenView(View):
-    """GET /api/auth/csrf/ -> Fuerza el envío de la cookie csrftoken al cliente."""
+    """Inicializa la cookie CSRF para las solicitudes del frontend."""
+
     def get(self, request, *args, **kwargs):
         return JsonResponse({"detail": "CSRF cookie set"})
-
-
 class LoginView(View):
     """POST /api/auth/login/  {"username": "...", "password": "..."}"""
 
@@ -626,12 +625,18 @@ class CuestionarioCompletoView(View):
         )
         return JsonResponse(s.cuestionario_completo_to_dict(cuestionario))
 
-
 class EvaluacionIniciarView(View):
-    """POST /api/evaluaciones/iniciar/"""
+    """
+    POST /api/evaluaciones/iniciar/
+    Body: {"estudiante": <id>, "cuestionario": <id>}
+
+    Inicia una evaluación para un estudiante.
+    Requiere personal autorizado.
+    """
 
     @require_staff
     def post(self, request, *args, **kwargs):
+        user = request.user
         try:
             body = _payload(request)
         except ValidationError as e:
@@ -648,23 +653,24 @@ class EvaluacionIniciarView(View):
         estudiante = Estudiante.objects.filter(pk=estudiante_id).first()
         if estudiante is None:
             return _json_error("Estudiante no encontrado.", status=404)
+        if not user.is_staff and not estudiante.activo:
+            return _json_error("El estudiante no está activo.", status=403)
 
         cuestionario = Cuestionario.objects.filter(pk=cuestionario_id).first()
         if cuestionario is None:
             return _json_error("Cuestionario no encontrado.", status=404)
         if not cuestionario.activo:
             return _json_error("El cuestionario no está activo.")
-
-        evaluacion = (
-            Evaluacion.objects
-            .filter(
-                estudiante=estudiante,
-                cuestionario=cuestionario,
-                estado=Evaluacion.Estado.EN_PROGRESO,
-            )
-            .order_by("-iniciada_en")
-            .first()
+            evaluaciones = Evaluacion.objects.filter(
+            estudiante=estudiante,
+            cuestionario=cuestionario,
+            estado=Evaluacion.Estado.EN_PROGRESO,
         )
+        if not user.is_staff:
+            evaluaciones = evaluaciones.filter(
+                pk__in=request.session.get("evaluaciones_publicas", [])
+            )
+        evaluacion = evaluaciones.order_by("-iniciada_en").first()
         created = False
         if evaluacion is None:
             try:
@@ -678,6 +684,11 @@ class EvaluacionIniciarView(View):
             except (ValidationError, IntegrityError) as e:
                 return _json_error(str(e), status=400)
 
+        if not user.is_staff and created:
+            ids = request.session.get("evaluaciones_publicas", [])
+            request.session["evaluaciones_publicas"] = [*ids, evaluacion.pk]
+
+        # Releer el cuestionario con anidamiento optimizado
         cuestionario_full = get_object_or_404(
             Cuestionario.objects.prefetch_related(
                 Prefetch(
@@ -700,10 +711,17 @@ class EvaluacionIniciarView(View):
 # =====================================================================
 
 class EvaluacionResponderView(View):
-    """POST /api/evaluaciones/{id}/responder/."""
+    """
+    POST /api/evaluaciones/{id}/responder/
 
-    @require_staff
+    VARK: recibe una lista de opciones por pregunta.
+    Personalidad: recibe dos opciones con sus respectivos puntos.
+
+    Requiere personal autorizado.
+    """
+
     def post(self, request, pk, *args, **kwargs):
+        user = request.user
         try:
             body = _payload(request)
         except ValidationError as exc:
@@ -719,9 +737,14 @@ class EvaluacionResponderView(View):
         try:
             with transaction.atomic():
                 evaluacion = get_object_or_404(
-                    Evaluacion.objects.select_for_update().select_related("cuestionario"),
+                    Evaluacion.objects.select_for_update().select_related("cuestionario", "estudiante"),
                     pk=pk,
                 )
+                if not user.is_staff and (
+                    not evaluacion.estudiante.activo
+                    or evaluacion.pk not in request.session.get("evaluaciones_publicas", [])
+                ):
+                    return _json_error("No puedes responder esta evaluación desde esta sesión.", status=403)
                 from apps.assessments.services import (
                     guardar_respuesta,
                     guardar_respuesta_personalidad,

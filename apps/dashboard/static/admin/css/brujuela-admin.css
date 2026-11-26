@@ -761,7 +761,7 @@ input[type="submit"]:hover{background:var(--admin-green-dark);color:#fff}
 }
 .bru-access-help strong{display:block;color:var(--admin-green-dark);font-size:14px}
 .bru-access-help p{margin:7px 0 0;font-size:12px;line-height:1.55}
-.bru-role-presets{
+.bru-role-presets,.bru-user-role-preview{
   max-width:860px;
   margin:0 0 18px;
   padding:18px;
@@ -769,8 +769,8 @@ input[type="submit"]:hover{background:var(--admin-green-dark);color:#fff}
   border-radius:10px;
   background:#fff;
 }
-.bru-role-presets strong{color:var(--admin-ink);font-size:14px}
-.bru-role-presets p{margin:7px 0;color:#586c60;font-size:12px;line-height:1.5}
+.bru-role-presets strong,.bru-user-role-preview strong{color:var(--admin-ink);font-size:14px}
+.bru-role-presets p,.bru-user-role-preview p{margin:7px 0;color:#586c60;font-size:12px;line-height:1.5}
 .bru-role-preset-controls{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:14px 0}
 .bru-role-preset-controls label{flex:0 0 100%;color:#445b4d;font-size:12px;font-weight:700}
 .bru-role-preset-controls select{flex:1 1 270px;min-width:0}
@@ -819,11 +819,22 @@ input[type="submit"]:hover{background:var(--admin-green-dark);color:#fff}
 .bru-results-bar-group{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
 .bru-results-bar{width:min(50px,70%);height:var(--height);background:var(--color);border-radius:5px 5px 0 0}
 .bru-results-bar-group small{text-align:center}
+.bru-results-chart-wide{gap:6px;overflow-x:auto}
+.bru-results-chart-wide .bru-results-bar-group{min-width:64px}
+.bru-results-chart-wide .bru-results-bar-group small{font-size:11px;line-height:1.2}
 .bru-results-recent{display:grid;gap:3px;padding:10px 0;border-bottom:1px solid var(--admin-line)}
 .bru-results-recent span{color:#65776b}
 .bru-results-table{overflow-x:auto}
 .bru-results-table table{width:100%;border-collapse:collapse}
 .bru-results-table th,.bru-results-table td{padding:10px;border-bottom:1px solid var(--admin-line);text-align:left}
+.bru-results-toolbar select{min-width:200px}
+.bru-results-dashboard button.bru-results-report{margin-left:auto}
+.bru-results-dashboard button.is-secondary{background:#fff;color:var(--admin-green-dark)}
+.bru-results-dashboard button.is-secondary:hover{background:#edf5ef}
+.bru-results-dashboard p.bru-results-scope{margin:-6px 0 14px;font-size:13px}
+.bru-results-dashboard p.bru-results-scope strong{color:var(--admin-green-dark)}
+.bru-results-search{margin:4px 0 12px}
+@media(max-width:700px){.bru-results-dashboard button.bru-results-report{margin-left:0;width:100%}}
 @media(max-width:700px){.bru-results-stats,.bru-results-grid{grid-template-columns:1fr}.bru-results-toolbar label,.bru-results-toolbar input,.bru-results-toolbar select{width:100%}}
 #content .module caption a:link,#content .module caption a:visited{color:var(--admin-green-dark)}
 .main > #nav-sidebar + .content,.main.shifted > #nav-sidebar + .content{max-width:none;min-width:0;flex:1}
@@ -968,6 +979,16 @@ div.breadcrumbs a:link,div.breadcrumbs a:visited{color:var(--admin-green-dark)}
 .bru-row-view:link,.bru-row-view:visited{display:inline-block;padding:7px 10px;border:1px solid #b9d8c6;border-radius:7px;background:#f1faf4;color:var(--admin-green-dark);font-size:12px;font-weight:600;white-space:nowrap}
 .bru-row-view:hover{background:#e2f2e7}
 .bru-row-view:focus-visible{outline:2px solid var(--admin-green);outline-offset:2px}
+.bru-row-edit:link,.bru-row-edit:visited{display:inline-block;padding:7px 10px;border:1px solid #b9d8c6;border-radius:7px;background:#f1faf4;color:var(--admin-green-dark);font-size:12px;font-weight:600;white-space:nowrap}
+.bru-row-edit:hover{background:#e2f2e7}
+.bru-row-edit:focus-visible{outline:2px solid var(--admin-green);outline-offset:2px}
+.bru-row-actions{display:inline-flex;flex-wrap:nowrap;gap:6px}
+
+/* Etiquetas de estado en listas */
+.bru-badge{display:inline-block;padding:3px 9px;border:1px solid #d5e3d9;border-radius:999px;background:#f5f8f5;color:#40584a;font-size:11px;font-weight:700;line-height:1.5;white-space:nowrap}
+.bru-badge.is-ok{border-color:#b9d8c6;background:#e8f4eb;color:var(--admin-green-dark)}
+.bru-badge.is-off{border-color:#e3c9c4;background:#fdf3f1;color:#9a3b2c}
+.bru-badge.is-warn{border-color:#ecd9a8;background:#fdf7e6;color:#8a6412}
 #changelist-form .results{max-width:100%;overflow-x:auto}
 #changelist .paginator{padding:14px 0 0;border:0;background:transparent;font-size:12px}
 .bru-empty-results{margin:8px 0 0;padding:16px;border-radius:8px;background:#f5f8f5;color:#52675a;font-size:13px;line-height:1.5}
@@ -980,6 +1001,287 @@ div.breadcrumbs a:link,div.breadcrumbs a:visited{color:var(--admin-green-dark)}
 #content .form-row label{color:#40584a}
 body.app-auth.model-user .form-row.field-usable_password:not(.errors):has(input[value="true"]:checked){display:none}
 .bru-mobile-nav-toggle{display:none}
+
+/* Ficha de usuario (alta y edición) */
+body.bru-user-edit #content-main{max-width:900px}
+.bru-user-intro{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:16px 20px;
+  margin:0 0 18px;
+  padding:22px 24px;
+  border:1px solid #d5e8dc;
+  border-radius:14px;
+  background:linear-gradient(120deg,#edf6ef,#f9fbf8);
+}
+.bru-user-avatar{
+  display:grid;
+  place-items:center;
+  flex:none;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background:var(--admin-green);
+  color:#fff;
+  font-size:20px;
+  font-weight:700;
+  letter-spacing:.5px;
+}
+.bru-user-intro-text,.bru-user-intro > div{flex:1 1 240px;min-width:0}
+.bru-user-kicker{color:var(--admin-green);font-size:10px;font-weight:700;letter-spacing:1px}
+.bru-user-intro h2{margin:4px 0;color:var(--admin-ink);font-size:22px;overflow-wrap:anywhere}
+.bru-user-intro p{margin:0;color:#52675a;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.bru-user-badges{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.bru-user-badges li{
+  padding:5px 10px;
+  border:1px solid #b9d8c6;
+  border-radius:999px;
+  background:#fff;
+  color:var(--admin-green-dark);
+  font-size:12px;
+  font-weight:700;
+}
+.bru-user-badges li.is-ok{border-color:var(--admin-green);background:var(--admin-green);color:#fff}
+.bru-user-badges li.is-off{border-color:#e3c9c4;background:#fdf3f1;color:#9a3b2c}
+.bru-user-badges li.is-muted{border-color:var(--admin-line);color:#5d7064;font-weight:600}
+
+/* Cada sección es una tarjeta */
+body.bru-user-edit fieldset.module{
+  margin:0 0 16px;
+  border:1px solid var(--admin-line);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+body.bru-user-edit fieldset.module h2{
+  margin:0;
+  padding:16px 20px;
+  border-bottom:1px solid var(--admin-line);
+  background:#f7faf7;
+  color:var(--admin-ink);
+  font-size:14px;
+}
+body.bru-user-edit fieldset.module .description{
+  padding:14px 20px 0;
+  color:#52675a;
+  font-size:12px;
+  line-height:1.55;
+}
+body.bru-user-edit .form-row{padding:14px 20px;border-bottom:0}
+body.bru-user-edit .form-row label{color:var(--admin-ink);font-size:12px;font-weight:700}
+body.bru-user-edit .form-row .help{margin-left:0;padding-left:0;color:#5d7064;font-size:12px;line-height:1.5}
+body.bru-user-edit .form-row .flex-container{flex-direction:column;align-items:stretch;gap:6px}
+body.bru-user-edit .form-row .flex-container.checkbox-row{flex-direction:row;align-items:center;gap:8px}
+body.bru-user-edit .form-row input.vTextField,
+body.bru-user-edit .form-row input[type="email"],
+body.bru-user-edit .form-row input[type="password"],
+body.bru-user-edit #id_rol{width:100%;max-width:520px;min-height:38px;box-sizing:border-box}
+
+/* Información personal en dos columnas cuando hay espacio */
+@supports(display:grid){
+  body.bru-user-edit fieldset.module:has(.field-first_name){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.bru-user-edit fieldset.module:has(.field-first_name) > h2,
+  body.bru-user-edit fieldset.module:has(.field-first_name) > .description,
+  body.bru-user-edit fieldset.module:has(.field-first_name) > .field-email{grid-column:1 / -1}
+}
+
+/* Rol y permisos en la misma tarjeta */
+body.bru-user-edit .field-rol{padding-bottom:10px}
+body.bru-user-edit .bru-user-template-preview{padding:0 20px 18px}
+body.bru-user-edit .bru-user-template-preview .bru-role-review{margin:0;max-width:640px}
+body.bru-user-edit .bru-user-template-preview strong{color:var(--admin-ink);font-size:13px}
+body.bru-user-edit .bru-user-template-preview p{margin:6px 0;color:#586c60;font-size:12px;line-height:1.5}
+body.bru-user-edit .bru-user-template-preview p:empty{display:none}
+/* Lista de permisos en una columna con barra de desplazamiento vertical */
+body.bru-user-edit .bru-user-template-preview ul{
+  max-height:220px;
+  margin:8px 0 0;
+  padding:8px 12px 8px 28px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  border:1px solid var(--admin-line);
+  border-radius:8px;
+  background:#fff;
+  scrollbar-gutter:stable;
+}
+body.bru-user-edit .bru-user-template-preview li{padding:3px 0;border-bottom:1px solid #eef3ef}
+body.bru-user-edit .bru-user-template-preview li:last-child{border-bottom:0}
+
+/* Contraseña */
+body.bru-user-edit #id_password p{margin:0 0 9px;color:#52675a;font-size:12px}
+body.bru-user-edit #id_password a.button{background:var(--admin-green);color:#fff;font-size:12px}
+body.bru-user-edit #id_password a.button:hover{background:var(--admin-green-dark)}
+
+/* Botones de guardar */
+body.bru-user-edit .submit-row{border-radius:14px}
+
+/* Formularios de todas las secciones en tarjetas (mismo diseño que la ficha de usuario) */
+body.change-form:not(.bru-user-edit) #content-main{max-width:900px}
+body.change-form:not(.bru-user-edit) fieldset.module{
+  margin:0 0 16px;
+  border:1px solid var(--admin-line);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+body.change-form:not(.bru-user-edit) fieldset.module > h2{
+  margin:0;
+  padding:16px 20px;
+  border-bottom:1px solid var(--admin-line);
+  background:#f7faf7;
+  color:var(--admin-ink);
+  font-size:14px;
+}
+body.change-form:not(.bru-user-edit) fieldset.module > .description{
+  padding:14px 20px 0;
+  color:#52675a;
+  font-size:12px;
+  line-height:1.55;
+}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row{padding:6px 18px;border-bottom:0}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row:first-of-type{padding-top:12px}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row:last-child{padding-bottom:16px}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row > div{margin:0}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row .help:empty{display:none}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row label{color:var(--admin-ink);font-size:12px;font-weight:700}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row .help{margin-left:0;padding-left:0;color:#5d7064;font-size:12px;line-height:1.5}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row .flex-container{flex-direction:column;align-items:stretch;gap:6px}
+body.change-form:not(.bru-user-edit) fieldset.aligned .form-row .flex-container.checkbox-row{flex-direction:row;align-items:center;gap:8px}
+body.change-form:not(.bru-user-edit) fieldset.aligned :is(input.vTextField,input.vIntegerField,input[type="email"],textarea,select){
+  width:100%;
+  max-width:560px;
+  box-sizing:border-box;
+}
+body.change-form:not(.bru-user-edit) fieldset.aligned textarea{height:4.8em;min-height:3.2em;resize:vertical}
+
+/* Formularios más compactos: menos espacio entre campos y campos de altura moderada */
+body.change-form fieldset.module > h2{padding:12px 18px}
+body.change-form fieldset.module > .description{padding:10px 18px 0}
+body.change-form fieldset.aligned .form-row{padding:8px 18px}
+body.change-form fieldset.aligned .form-row .flex-container{gap:4px}
+body.change-form fieldset.aligned .form-row .help{margin-top:2px}
+body.change-form fieldset.aligned :is(input.vTextField,input.vIntegerField,input[type="email"],input[type="password"],select){min-height:34px;padding-top:6px;padding-bottom:6px}
+body.change-form fieldset.module{margin-bottom:12px}
+body.change-form fieldset.module:last-of-type .form-row:last-child{padding-bottom:14px}
+body.change-form:not(.bru-user-edit) .inline-group{border-radius:14px;overflow:hidden}
+body.change-form:not(.bru-user-edit) .inline-group .tabular td textarea{width:100%;min-height:44px;box-sizing:border-box}
+
+/* Tablas de preguntas / opciones dentro del cuestionario */
+.bru-inline-questions .tabular td{vertical-align:middle}
+.bru-inline-questions .tabular td textarea{height:2.6em;min-height:2.6em;padding-top:6px;padding-bottom:6px;resize:vertical}
+.bru-inline-questions .tabular td.field-orden input{width:64px;text-align:center}
+.bru-inline-questions .tabular td.field-dimension select{min-width:150px}
+.bru-inline-questions .tabular tr.form-row td.original{position:relative;width:1%;padding:10px 8px}
+.bru-inline-questions .tabular td.original p{
+  position:static;
+  height:auto;
+  margin:0;
+  padding:0;
+  font-size:12px;
+  line-height:1.3;
+  white-space:nowrap;
+}
+.bru-inline-questions .tabular td.original p *:not(a){display:none}
+.bru-inline-questions .tabular td{padding-top:6px;padding-bottom:6px}
+.bru-inline-questions .tabular td input,.bru-inline-questions .tabular td select{min-height:32px}
+.bru-inline-questions .tabular tr.has_original td{padding-top:10px;padding-bottom:10px}
+.bru-inline-questions a.bru-inline-edit{
+  display:inline-block;
+  padding:6px 10px;
+  border:1px solid #b9d8c6;
+  border-radius:7px;
+  background:#f1faf4;
+  color:var(--admin-green-dark);
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.bru-inline-questions a.bru-inline-edit:hover{background:#e2f2e7}
+.bru-inline-questions .add-row{padding:10px 14px}
+.bru-inline-questions .add-row a{font-weight:700}
+body.change-form .submit-row{border-radius:14px}
+
+/* Eliminar (todas las secciones) */
+.bru-delete{max-width:760px}
+.bru-delete-detail{margin:6px 0 0;font-size:13px}
+.bru-delete-detail summary{color:var(--admin-green-dark);font-weight:700;cursor:pointer}
+.bru-delete-detail ul{
+  max-height:220px;
+  margin:8px 0 0;
+  padding:8px 12px 8px 28px;
+  overflow-y:auto;
+  border:1px solid var(--admin-line);
+  border-radius:8px;
+  background:#fff;
+  color:#40584a;
+}
+.bru-delete-card{border-color:#ecd3ce;background:linear-gradient(120deg,#fdf3f1,#fbfaf8)}
+.bru-user-avatar.is-danger{background:#b4412f}
+.bru-user-kicker.is-danger{color:#b4412f}
+.bru-delete-panel{
+  padding:20px 22px;
+  border:1px solid var(--admin-line);
+  border-radius:14px;
+  background:#fff;
+}
+.bru-delete-panel > strong{display:block;color:var(--admin-ink);font-size:16px}
+.bru-delete-panel p{margin:8px 0;color:#52675a;font-size:13px;line-height:1.55}
+.bru-delete-effects{margin:12px 0;padding:0;list-style:none}
+.bru-delete-effects li{
+  position:relative;
+  padding:7px 0 7px 26px;
+  border-bottom:1px solid #f0f3f0;
+  color:#40584a;
+  font-size:13px;
+  line-height:1.5;
+}
+.bru-delete-effects li:last-child{border-bottom:0}
+.bru-delete-effects li::before{
+  content:"!";
+  position:absolute;
+  left:0;
+  top:8px;
+  display:grid;
+  place-items:center;
+  width:17px;
+  height:17px;
+  border-radius:50%;
+  background:#fbe4df;
+  color:#b4412f;
+  font-size:11px;
+  font-weight:700;
+}
+.bru-delete-tip{padding:10px 12px;border-radius:8px;background:#f2f8f3}
+.bru-delete-tip a{color:var(--admin-green-dark);font-weight:700}
+.bru-delete-panel.is-blocked{border-color:#ecd3ce;background:#fdf6f4}
+.bru-delete-panel.is-blocked ul{max-height:220px;overflow-y:auto;color:#40584a;font-size:13px}
+.bru-delete-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:18px}
+.bru-delete-actions .bru-delete-cancel,
+.bru-delete-actions .bru-delete-confirm{
+  min-height:40px;
+  padding:10px 18px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.2;
+  cursor:pointer;
+  text-decoration:none;
+}
+.bru-delete-actions .bru-delete-cancel{border:1px solid #b9d8c6;background:#fff;color:var(--admin-green-dark)}
+.bru-delete-actions .bru-delete-cancel:hover{background:#e8f4eb}
+.bru-delete-actions .bru-delete-confirm{border:1px solid #b4412f;background:#b4412f;color:#fff}
+.bru-delete-actions .bru-delete-confirm:hover{background:#963425}
+@media(max-width:520px){
+  .bru-delete-actions{flex-direction:column-reverse}
+  .bru-delete-actions .bru-delete-cancel,.bru-delete-actions .bru-delete-confirm{width:100%;text-align:center}
+}
+
+@media(max-width:700px){
+  .bru-user-intro{padding:18px}
+  body.bru-user-edit .form-row{padding:12px 16px}
+  body.bru-user-edit fieldset.module:has(.field-first_name){grid-template-columns:minmax(0,1fr)}
+}
 
 @media(max-width:1100px){
   #changelist{grid-template-columns:minmax(0,1fr)}
@@ -1115,18 +1417,100 @@ body.app-auth.model-user .form-row.field-usable_password:not(.errors):has(input[
 .bru-builder-details label{margin-top:12px}
 .bru-builder-question{border-left:4px solid #a9cfb6}
 .bru-builder-question > label{margin-top:14px}
-.bru-builder-options-heading{display:flex;flex-wrap:wrap;gap:4px 12px;margin:17px 0 10px;color:#40584a;font-size:13px}
-.bru-builder-options-heading span{color:#718277;font-size:12px}
+/* Encabezado de cada pregunta: número, título, contador y eliminar */
+.bru-builder-question-head{display:flex;align-items:center;gap:12px}
+.bru-builder-number{
+  display:grid;
+  place-items:center;
+  flex:none;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:var(--admin-green);
+  color:#fff;
+  font-size:14px;
+  font-weight:700;
+}
+.bru-builder-question-title{flex:1;min-width:0}
+.bru-builder .bru-builder-question-title h3{margin:0;font-size:15px}
+.bru-builder-count{color:#718277;font-size:12px}
+.bru-builder-question-text textarea{height:2.8em;min-height:2.8em}
+/* Constructor más compacto */
+.bru-builder textarea{min-height:3em;height:3.6em}
+.bru-builder-grid{margin-top:10px;gap:12px}
+.bru-builder-details label{margin-top:8px}
+.bru-builder label{gap:4px}
+.bru-builder input,.bru-builder select{min-height:34px}
+.bru-builder-question > label{margin-top:10px}
+.bru-builder-card.bru-builder-question{padding-top:14px;padding-bottom:14px}
+.bru-builder-questions-heading{margin:18px 0 10px}
+.bru-builder-options-heading{display:flex;flex-direction:column;gap:2px;margin:18px 0 8px;color:#40584a;font-size:13px}
+.bru-builder-options-heading span{color:#718277;font-size:12px;font-weight:400}
+.bru-builder-options-columns,
 .bru-builder-option{
   display:grid;
-  grid-template-columns:minmax(0,2fr) minmax(140px,1fr) auto;
-  align-items:end;
+  grid-template-columns:28px minmax(0,1fr) minmax(150px,210px) 34px;
+  align-items:center;
   gap:10px;
-  margin:0 0 10px;
-  padding:12px;
-  border-radius:8px;
-  background:#f7faf7;
 }
+.bru-builder-options-columns{padding:0 10px 4px;color:#718277;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.bru-builder-options{margin:0;padding:0;list-style:none}
+.bru-builder-option{
+  margin:0 0 6px;
+  padding:5px 8px;
+  border:1px solid #e3ece5;
+  border-left:4px solid #d5e3d9;
+  border-radius:8px;
+  background:#f9fbf9;
+}
+/* Color de la dimensión elegida (mismos colores que la gráfica del tablero) */
+.bru-builder-option[data-dimension="V"],.bru-builder-option[data-dimension="E"]{border-left-color:#63a881}
+.bru-builder-option[data-dimension="A"],.bru-builder-option[data-dimension="S"]{border-left-color:#d6a461}
+.bru-builder-option[data-dimension="R"],.bru-builder-option[data-dimension="T"]{border-left-color:#8c7ab8}
+.bru-builder-option[data-dimension="K"],.bru-builder-option[data-dimension="J"]{border-left-color:#d78671}
+.bru-builder-option[data-dimension="I"]{border-left-color:#a9d1b9}
+.bru-builder-option[data-dimension="N"]{border-left-color:#ebcd9f}
+.bru-builder-option[data-dimension="F"]{border-left-color:#c5bbdc}
+.bru-builder-option[data-dimension="P"]{border-left-color:#ecbcae}
+.bru-builder-letter{
+  display:grid;
+  place-items:center;
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  background:#e6f1e9;
+  color:var(--admin-green-dark);
+  font-size:12px;
+  font-weight:700;
+}
+.bru-builder-option input,.bru-builder-option select{height:34px;min-height:34px;padding-top:4px;padding-bottom:4px;line-height:1.3}
+.bru-builder-option select{padding-right:26px}
+.bru-builder-options-heading{margin:12px 0 6px}
+.bru-builder-remove-option{
+  width:34px;
+  height:34px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:transparent;
+  color:#99584a;
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+}
+.bru-builder-remove-option:hover{border-color:#eadbd5;background:#fdf3f1}
+.bru-builder-add-option{
+  margin-top:2px;
+  padding:9px 12px;
+  border:1px dashed #b9d8c6;
+  border-radius:8px;
+  background:transparent;
+  color:var(--admin-green-dark);
+  font:700 12px/1.3 "DM Sans",Arial,sans-serif;
+  cursor:pointer;
+}
+.bru-builder-add-option:hover{background:var(--admin-mint)}
+.bru-builder-add-option[hidden]{display:none}
+.bru-builder-summary{margin-right:auto;color:#52675a;font-size:13px;font-weight:700}
 .bru-builder-primary,.bru-builder-secondary,.bru-builder-remove{
   min-height:38px;
   padding:9px 13px;
@@ -1146,10 +1530,290 @@ body.app-auth.model-user .form-row.field-usable_password:not(.errors):has(input[
 .bru-builder-actions p{flex-basis:100%;margin:0}
 .bru-builder-preview li{margin:10px 0;color:#40584a;font-size:13px;line-height:1.5}
 .bru-builder-preview ul{margin:6px 0;padding-left:22px}
+
+/* ===== Editar cuestionario: preguntas como tarjetas (pregunta arriba, opciones abajo) ===== */
+.bru-question-cards fieldset.module{border:0;background:transparent;overflow:visible}
+.bru-question-cards fieldset.module > h2{border:1px solid var(--admin-line);border-radius:12px}
+.bru-question-cards .tabular table{display:block;width:100%;border:0;background:transparent}
+.bru-question-cards .tabular thead{display:none}
+.bru-question-cards .tabular tbody{display:grid;gap:12px;padding:12px 0 0}
+.bru-question-cards .tabular tr.form-row:not(.empty-form){
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  grid-template-areas:"texto texto" "orden delete";
+  gap:0 12px;
+  padding:16px 20px 10px;
+  border:1px solid var(--admin-line);
+  border-left:4px solid transparent;
+  border-radius:12px;
+  background:#fff;
+  transition:border-color .15s,box-shadow .15s;
+}
+.bru-question-cards .tabular tr.form-row:not(.empty-form):focus-within{border-left-color:var(--admin-green);box-shadow:0 6px 18px rgba(36,54,45,.08)}
+.bru-question-cards .tabular tr.form-row td,
+.bru-question-cards .tabular tr.has_original td{display:block;padding:0;border:0;background:transparent}
+.bru-question-cards .tabular tr.form-row td.original{display:none}
+.bru-question-cards .tabular tr.form-row td.field-texto{grid-area:texto}
+.bru-question-cards .tabular tr.form-row td.field-texto textarea{
+  width:100%;
+  max-width:none;
+  height:2.8em;
+  min-height:2.8em;
+  padding:8px 6px;
+  border:0;
+  border-bottom:2px solid #dbe6de;
+  border-radius:0;
+  background:#f9fbf9;
+  font-size:15px;
+  font-weight:600;
+  resize:vertical;
+}
+.bru-question-cards .tabular td.field-texto textarea:focus{border-bottom-color:var(--admin-green);outline:none;background:#f3f8f4}
+.bru-question-cards .tabular tr.form-row td.field-orden,
+.bru-question-cards .tabular tr.form-row td.delete{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #edf2ee;
+}
+.bru-question-cards .tabular tr.form-row td.field-orden{grid-area:orden}
+.bru-question-cards .tabular tr.form-row td.field-orden input{width:58px;min-height:30px;text-align:center}
+.bru-question-cards .tabular tr.form-row td.delete{grid-area:delete;justify-content:flex-end;width:auto}
+.bru-card-label{color:#718277;font-size:12px;font-weight:700}
+.bru-card-count{margin-right:auto;color:#52675a;font-size:12px;font-weight:700}
+.bru-card-delete,
+.bru-question-cards .tabular td.delete .inline-deletelink{
+  display:inline-block;
+  width:auto;
+  height:auto;
+  min-height:32px;
+  padding:6px 12px;
+  border:1px solid #eadbd5;
+  border-radius:8px;
+  background:#fff;
+  color:#99584a;
+  font:700 12px/1.3 "DM Sans",Arial,sans-serif;
+  text-indent:0;
+  cursor:pointer;
+}
+.bru-card-delete:hover,.bru-question-cards .tabular td.delete .inline-deletelink:hover{background:#fdf3f1}
+/* Opciones debajo de la pregunta */
+.bru-card-options{margin-top:10px}
+.bru-card-option-list{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.bru-card-option{
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) minmax(140px,200px) 32px;
+  align-items:center;
+  gap:10px;
+  padding-left:4px;
+}
+.bru-card-choice{width:16px;height:16px;border:2px solid #9fb5a7;border-radius:3px}
+.bru-question-cards[data-type="PERSONALIDAD"] .bru-card-choice{border-radius:50%}
+.bru-question-cards .tabular .bru-card-option input{
+  width:100%;
+  height:32px;
+  min-height:32px;
+  padding:4px 2px;
+  border:0;
+  border-bottom:1px solid #dbe6de;
+  border-radius:0;
+  background:transparent;
+}
+.bru-question-cards .tabular .bru-card-option input:focus{border-bottom:2px solid var(--admin-green);outline:none}
+.bru-card-option select{height:32px;min-height:32px;padding:4px 26px 4px 8px;border-left:4px solid #d5e3d9}
+.bru-card-option[data-dimension="V"] select,.bru-card-option[data-dimension="E"] select{border-left-color:#63a881}
+.bru-card-option[data-dimension="A"] select,.bru-card-option[data-dimension="S"] select{border-left-color:#d6a461}
+.bru-card-option[data-dimension="R"] select,.bru-card-option[data-dimension="T"] select{border-left-color:#8c7ab8}
+.bru-card-option[data-dimension="K"] select,.bru-card-option[data-dimension="J"] select{border-left-color:#d78671}
+.bru-card-option[data-dimension="I"] select{border-left-color:#a9d1b9}
+.bru-card-option[data-dimension="N"] select{border-left-color:#ebcd9f}
+.bru-card-option[data-dimension="F"] select{border-left-color:#c5bbdc}
+.bru-card-option[data-dimension="P"] select{border-left-color:#ecbcae}
+.bru-card-option-remove{
+  width:32px;
+  height:32px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:transparent;
+  color:#99584a;
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+}
+.bru-card-option-remove:hover{border-color:#eadbd5;background:#fdf3f1}
+.bru-card-add-option{
+  margin:6px 0 0 30px;
+  padding:6px 8px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--admin-green-dark);
+  font:700 12px/1.3 "DM Sans",Arial,sans-serif;
+  cursor:pointer;
+}
+.bru-card-add-option::before{content:"+ "}
+.bru-card-add-option:hover{background:var(--admin-mint)}
+.bru-card-add-option[hidden]{display:none}
+.bru-card-note{margin:6px 0 0;color:#52675a;font-size:12px}
+.bru-card-note:empty{display:none}
+/* Estados */
+.bru-question-cards .tabular tr.is-deleted{opacity:.55;background:#fbf6f5}
+.bru-question-cards .tabular tr.is-deleted td.field-texto::before{content:"Se eliminará al guardar";display:block;margin-bottom:6px;color:#99584a;font-size:12px;font-weight:700}
+.bru-question-cards .tabular tr.is-deleted .bru-card-options{pointer-events:none}
+.bru-question-cards .tabular tr.has-error{border-left-color:#b4412f}
+.bru-question-cards .tabular tr.has-error .bru-card-note{color:#9a3b2c;font-weight:700}
+.bru-question-cards .tabular tr.row-form-errors{display:block}
+/* «Agregar pregunta» al final */
+.bru-question-cards .add-row{display:block;margin-top:12px;padding:0;border:0;background:transparent}
+.bru-question-cards .add-row td{display:block;padding:0}
+.bru-question-cards .add-row a{
+  display:block;
+  padding:14px;
+  border:1px dashed #b9d8c6;
+  border-radius:12px;
+  background:#fff;
+  color:var(--admin-green-dark);
+  font-size:13px;
+  font-weight:700;
+  text-align:center;
+}
+.bru-question-cards .add-row a:hover{background:var(--admin-mint)}
+@media(max-width:760px){
+  .bru-card-option{grid-template-columns:20px minmax(0,1fr) 32px}
+  .bru-card-option select{grid-column:2 / 3}
+}
+
+/* ===== Vista previa: el formulario como lo verá el estudiante ===== */
+.bru-builder-preview{background:#f3f7f4}
+.bru-preview-form{display:grid;gap:12px;max-width:720px;margin:10px auto 0}
+.bru-preview-header,.bru-preview-question{
+  margin:0;
+  padding:18px 22px;
+  border:1px solid var(--admin-line);
+  border-radius:12px;
+  background:#fff;
+}
+.bru-preview-header{border-top:8px solid var(--admin-green)}
+.bru-builder .bru-preview-header h3{margin:4px 0 6px;font-size:22px}
+.bru-preview-type{color:var(--admin-green);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.bru-preview-header small{color:#718277;font-size:12px}
+.bru-builder .bru-preview-instructions{padding:8px 12px;border-radius:8px;background:#f0f6f2}
+.bru-preview-question legend{float:left;width:100%;margin:0 0 4px;padding:0;color:var(--admin-ink);font-size:15px;font-weight:700}
+.bru-builder .bru-preview-help{clear:both;margin:0 0 8px;color:#718277;font-size:12px}
+.bru-builder .bru-preview-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:0 0 6px;
+  padding:9px 12px;
+  border:1px solid #e3ece5;
+  border-radius:8px;
+  font-weight:400;
+  cursor:pointer;
+}
+.bru-builder .bru-preview-option:hover{background:#f7faf7}
+.bru-builder .bru-preview-option:has(input:checked){border-color:var(--admin-green);background:#eef6f0}
+.bru-builder .bru-preview-option input{width:auto;margin:0}
+.bru-preview-points label{max-width:320px}
+.bru-preview-form > .bru-builder-primary{justify-self:start;opacity:.6;cursor:not-allowed}
+
+/* ===== Constructor estilo formulario: pregunta arriba, opciones debajo ===== */
+.bru-visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.bru-builder-question-list{display:grid;gap:12px}
+.bru-builder .bru-builder-question{
+  margin:0;
+  padding:18px 22px 12px;
+  border:1px solid var(--admin-line);
+  border-left:4px solid transparent;
+  border-radius:12px;
+  transition:border-color .15s,box-shadow .15s;
+}
+.bru-builder .bru-builder-question:focus-within{border-left-color:var(--admin-green);box-shadow:0 6px 18px rgba(36,54,45,.08)}
+.bru-builder-question-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.bru-builder-question-head .bru-builder-number{margin-top:4px}
+.bru-builder .bru-builder-question-input{
+  flex:1;
+  height:auto;
+  min-height:0;
+  padding:8px 4px;
+  border:0;
+  border-bottom:2px solid #dbe6de;
+  border-radius:0;
+  background:#f9fbf9;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.4;
+  resize:none;
+  overflow:hidden;
+}
+.bru-builder .bru-builder-question-input:focus{border-bottom-color:var(--admin-green);outline:none;background:#f3f8f4}
+.bru-builder .bru-builder-option{
+  grid-template-columns:20px minmax(0,1fr) minmax(140px,200px) 32px;
+  gap:10px;
+  margin:0;
+  padding:4px 0 4px 46px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.bru-builder-choice{width:16px;height:16px;border:2px solid #9fb5a7;border-radius:50%}
+.bru-builder[data-type="VARK"] .bru-builder-choice{border-radius:3px}
+.bru-builder .bru-builder-option input[data-option-text]{
+  height:32px;
+  min-height:32px;
+  padding:4px 2px;
+  border:0;
+  border-bottom:1px solid #dbe6de;
+  border-radius:0;
+  background:transparent;
+}
+.bru-builder .bru-builder-option input[data-option-text]:focus{border-bottom:2px solid var(--admin-green);outline:none}
+/* El color de la dimensión se muestra en el selector */
+.bru-builder .bru-builder-option select{border-left:4px solid #d5e3d9}
+.bru-builder .bru-builder-option[data-dimension="V"] select,.bru-builder .bru-builder-option[data-dimension="E"] select{border-left-color:#63a881}
+.bru-builder .bru-builder-option[data-dimension="A"] select,.bru-builder .bru-builder-option[data-dimension="S"] select{border-left-color:#d6a461}
+.bru-builder .bru-builder-option[data-dimension="R"] select,.bru-builder .bru-builder-option[data-dimension="T"] select{border-left-color:#8c7ab8}
+.bru-builder .bru-builder-option[data-dimension="K"] select,.bru-builder .bru-builder-option[data-dimension="J"] select{border-left-color:#d78671}
+.bru-builder .bru-builder-option[data-dimension="I"] select{border-left-color:#a9d1b9}
+.bru-builder .bru-builder-option[data-dimension="N"] select{border-left-color:#ebcd9f}
+.bru-builder .bru-builder-option[data-dimension="F"] select{border-left-color:#c5bbdc}
+.bru-builder .bru-builder-option[data-dimension="P"] select{border-left-color:#ecbcae}
+.bru-builder .bru-builder-add-option{
+  margin:6px 0 0 46px;
+  padding:6px 8px;
+  border:0;
+  background:transparent;
+  color:var(--admin-green-dark);
+}
+.bru-builder .bru-builder-add-option::before{content:"+ "}
+.bru-builder .bru-builder-add-option:hover{background:var(--admin-mint);border-radius:6px}
+.bru-builder-question-foot{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 12px;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #edf2ee;
+}
+.bru-builder-question-foot .bru-builder-count{color:#52675a;font-size:12px;font-weight:700}
+.bru-builder-hint{flex:1;color:#718277;font-size:12px}
+.bru-builder-question-foot .bru-builder-remove{min-height:32px;padding:6px 10px}
+.bru-builder .bru-add-question-bottom{margin-top:12px;padding:14px;font-size:13px}
+@media(max-width:760px){
+  .bru-builder .bru-builder-question{padding:14px 14px 10px}
+  .bru-builder .bru-builder-option{grid-template-columns:20px minmax(0,1fr) 32px;padding-left:0}
+  .bru-builder .bru-builder-option select{grid-column:2 / 3}
+  .bru-builder .bru-builder-add-option{margin-left:0}
+}
 @media(max-width:760px){
   .bru-builder-card{padding:16px}
-  .bru-builder-grid,.bru-builder-option{grid-template-columns:minmax(0,1fr)}
-  .bru-builder-option .bru-builder-remove{justify-self:start}
+  .bru-builder-grid{grid-template-columns:minmax(0,1fr)}
+  .bru-builder-options-columns{display:none}
+  .bru-builder-option{grid-template-columns:26px minmax(0,1fr) 34px}
+  .bru-builder-option select{grid-column:2 / 3}
   .bru-builder-actions button{width:100%}
 }
 

@@ -3,6 +3,7 @@
 from functools import wraps
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
+from apps.students.models import Estudiante
 
 
 def user_to_dict(user):
@@ -16,6 +17,9 @@ def user_to_dict(user):
         "last_name": user.last_name,
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
+        "estudiante_id": Estudiante.objects.filter(
+            usuario=user, activo=True
+        ).values_list("id", flat=True).first(),
     }
 
 
