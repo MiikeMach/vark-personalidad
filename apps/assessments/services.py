@@ -205,6 +205,16 @@ def guardar_respuesta_personalidad(
             "La evaluación no corresponde a personalidad."
         )
 
+    # Validar identificadores antes de consultar opciones.
+    if (
+        type(pregunta_id) is not int
+        or type(opcion_1_id) is not int
+        or type(opcion_2_id) is not int
+    ):
+        raise ValidationError(
+            "Los identificadores de pregunta y opciones deben ser enteros."
+        )
+
     # Comprobar primero la distribución numérica.
     validar_distribucion_personalidad(puntos_1, puntos_2)
 

@@ -179,6 +179,32 @@ class ValidarSeleccionesTests(TestCase):
             ).exists()
         )
 
+    def test_personalidad_rechaza_identificadores_invalidos(self):
+        identificadores_invalidos = [
+            "texto",
+            str(self.opcion_e.pk),
+            True,
+            None,
+        ]
+
+        for identificador in identificadores_invalidos:
+            with self.subTest(identificador=identificador):
+                with self.assertRaises(ValidationError):
+                    guardar_respuesta_personalidad(
+                        self.evaluacion_personalidad.pk,
+                        self.pregunta_personalidad.pk,
+                        identificador,
+                        7,
+                        self.opcion_i.pk,
+                        3,
+                    )
+
+        self.assertFalse(
+            Respuesta.objects.filter(
+                evaluacion=self.evaluacion_personalidad,
+                pregunta=self.pregunta_personalidad,
+            ).exists()
+        )
 
     def test_actualizar_respuesta_reemplaza_selecciones(self):
         guardar_respuesta(
