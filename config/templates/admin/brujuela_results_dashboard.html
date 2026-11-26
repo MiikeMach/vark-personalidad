@@ -12,11 +12,12 @@
     <label>Grupo
       <select id="groupFilter"><option value="">Todos los grupos</option></select>
     </label>
-    <label>Buscar
-      <input id="resultSearch" type="search" placeholder="Nombre, matrícula o grupo">
+    <label>Alumno
+      <select id="studentFilter"><option value="">Todos los alumnos</option></select>
     </label>
-    <button type="button" id="searchButton">Buscar</button>
+    <button type="button" id="reportButton" class="bru-results-report">PDF del alcance</button>
   </div>
+  <p class="bru-results-scope">Alcance: <strong id="scopeLabel">Total</strong></p>
   <div class="bru-results-stats">
     <article><span>Evaluaciones</span><strong id="statEvaluations">—</strong><small>registradas en el sistema</small></article>
     <article><span>Estudiantes</span><strong id="statStudents">—</strong><small>perfiles activos</small></article>
@@ -33,8 +34,20 @@
     </article>
   </div>
   <article class="bru-results-card">
+    <h3>Preferencias de personalidad</h3>
+    <p>Puntos acumulados en cada dimensión; cada par muestra los dos polos de un mismo eje.</p>
+    <div id="personalityChart" class="bru-results-chart bru-results-chart-wide" role="img" aria-label="Gráfico de resultados de personalidad">Cargando resultados…</div>
+  </article>
+  <article class="bru-results-card">
     <h3>Resultados encontrados</h3>
-    <p>Busca por nombre, matrícula o grupo para consultar la ficha.</p>
+    <p>Busca por nombre, matrícula o grupo, o muestra todos los del alcance elegido.</p>
+    <div class="bru-results-toolbar bru-results-search">
+      <label>Buscar
+        <input id="resultSearch" type="search" placeholder="Nombre, matrícula o grupo">
+      </label>
+      <button type="button" id="searchButton">Buscar</button>
+      <button type="button" id="showAllResults" class="is-secondary">Ver todos</button>
+    </div>
     <div class="bru-results-table">
       <table>
         <thead><tr><th>Estudiante</th><th>Matrícula</th><th>Instrumento</th><th>Estado</th><th>Resultado</th><th>Ficha</th></tr></thead>
